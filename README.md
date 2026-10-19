@@ -2,7 +2,27 @@
 
 粘贴小红书链接（或文字），自动生成结构化菜谱卡；数据保存在本机。
 
-## 启动
+## Docker 部署（推荐给别人用）
+
+```bash
+# 1. 构建镜像
+docker build -t everybite .
+
+# 2. 运行（数据持久化到命名卷，AI 整理可选）
+docker run -d --name everybite -p 3456:3456 \
+  -e LLM_API_KEY=你的Key \
+  -e LLM_BASE_URL=https://api.deepseek.com/v1 \
+  -e LLM_MODEL=deepseek-flash \
+  -v everybite-data:/app/src/data \
+  -v everybite-covers:/app/covers \
+  everybite
+```
+
+- 访问：`http://localhost:3456`，同一局域网的手机用 `http://<主机IP>:3456`
+- 不配 `LLM_*` 环境变量也能跑（内置规则解析兜底）；任何 OpenAI 兼容接口（Kimi / DeepSeek 等）均可
+- 数据在 `everybite-data`（SQLite 菜谱库）和 `everybite-covers`（封面素材）两个卷里，删容器不丢数据
+
+## 本地启动
 
 双击 `启动.bat`（或执行 `npm start`）。启动后终端会打印：
 

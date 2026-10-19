@@ -1,0 +1,12 @@
+node_modules/
+web/node_modules/
+web/dist/
+src/data/
+covers/
+.env
+.git/
+*.log
+ui-mockup/
+设计方案.md
+Dockerfile
+.dockerignore
