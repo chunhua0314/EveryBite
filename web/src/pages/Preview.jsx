@@ -80,6 +80,21 @@ export default function Preview({ preview, setPreview, referenceText, onSaved, o
             className="font-serif text-[30px] font-extrabold text-ink mt-1 mb-0.5 w-full bg-transparent outline-none border-b border-transparent focus:border-olive-line"
           />
           <div className="text-[11px] text-muted tracking-[2.5px] mb-3">{p.subtitle || ''}</div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[12px] text-muted shrink-0">主分类</span>
+            <input
+              value={p.category || ''}
+              onChange={e => patch({ category: e.target.value })}
+              list="common-categories"
+              placeholder="如 川菜 / 家常菜"
+              className="text-xs border border-olive-line rounded-full px-3 py-1.5 outline-none w-32 bg-white text-olive font-semibold focus:border-olive"
+            />
+            <datalist id="common-categories">
+              {['川菜', '粤菜', '湘菜', '东北菜', '江浙菜', '家常菜', '汤羹', '主食', '面点', '甜品', '饮品', '轻食', '其他'].map(c => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </div>
           {p.summary && <p className="text-[13px] text-ink2 leading-[1.9] mb-3.5">{p.summary}</p>}
           <TagEditor tags={p.tags || []} onChange={tags => patch({ tags })} />
           {statLine && <div className="text-[12.5px] text-ink2 mt-3.5">{statLine}</div>}

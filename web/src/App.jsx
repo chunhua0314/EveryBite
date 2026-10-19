@@ -10,6 +10,8 @@ export default function App() {
   const [view, setView] = useState({ name: 'home' });
   const [recipes, setRecipes] = useState([]);
   const [allTags, setAllTags] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
   const [q, setQ] = useState('');
   const [preview, setPreview] = useState(null);
@@ -27,16 +29,18 @@ export default function App() {
 
   const refresh = useCallback(async () => {
     try {
-      const [list, tags] = await Promise.all([
-        api.listRecipes({ q, tags: selectedTags }),
+      const [list, tags, cats] = await Promise.all([
+        api.listRecipes({ q, tags: selectedTags, category: selectedCategory }),
         api.listTags(),
+        api.listCategories(),
       ]);
       setRecipes(list);
       setAllTags(tags);
+      setCategories(cats);
     } catch (e) {
       onError(e.message);
     }
-  }, [q, selectedTags, onError]);
+  }, [q, selectedTags, selectedCategory, onError]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -74,6 +78,20 @@ export default function App() {
           {navBtn('add', '➕', '添加菜谱', !navHome)}
         </nav>
         <div className="mt-6 px-2.5">
+          <h4 className="text-xs text-muted mb-2.5 font-medium">主分类</h4>
+          <span
+            className={`inline-block mr-1.5 mb-2 text-xs px-2.5 py-[5px] rounded-full cursor-pointer ${!selectedCategory ? 'bg-olive text-white' : 'bg-bg text-ink2'}`}
+            onClick={() => setSelectedCategory('')}
+          >全部</span>
+          {categories.map(c => (
+            <span
+              key={c.name}
+              className={`inline-block mr-1.5 mb-2 text-xs px-2.5 py-[5px] rounded-full cursor-pointer ${selectedCategory === c.name ? 'bg-olive text-white' : 'bg-bg text-ink2'}`}
+              onClick={() => { setSelectedCategory(selectedCategory === c.name ? '' : c.name); if (view.name !== 'home') go('home'); }}
+            >{c.name}<span className="opacity-60 ml-0.5">{c.count}</span></span>
+          ))}
+        </div>
+        <div className="mt-4 px-2.5">
           <h4 className="text-xs text-muted mb-2.5 font-medium">全部标签</h4>
           <span
             className={`inline-block mr-1.5 mb-2 text-xs px-2.5 py-[5px] rounded-full cursor-pointer ${!selectedTags.length ? 'bg-olive text-white' : 'bg-bg text-ink2'}`}
@@ -96,6 +114,9 @@ export default function App() {
             <Home
               recipes={recipes}
               allTags={allTags}
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onSelectCategory={setSelectedCategory}
               selectedTags={selectedTags}
               onToggleTag={toggleTag}
               q={q}

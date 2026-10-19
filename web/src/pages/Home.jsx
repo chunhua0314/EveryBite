@@ -1,7 +1,7 @@
 import React from 'react';
 import { Stars, Cover } from '../components.jsx';
 
-export default function Home({ recipes, allTags, selectedTags, onToggleTag, q, setQ, onOpen }) {
+export default function Home({ recipes, allTags, categories = [], selectedCategory, onSelectCategory, selectedTags, onToggleTag, q, setQ, onOpen }) {
   return (
     <section>
       <div className="flex items-baseline justify-between px-0.5 pt-5 pb-3.5">
@@ -19,6 +19,26 @@ export default function Home({ recipes, allTags, selectedTags, onToggleTag, q, s
         />
         {q && <button onClick={() => setQ('')} className="text-muted">✕</button>}
       </div>
+
+      {categories.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto no-scrollbar px-0.5 pb-2 md:flex-wrap items-center">
+          <span className="shrink-0 text-[11px] text-muted">主分类</span>
+          <button
+            className={`shrink-0 border text-[12.5px] px-3.5 py-[7px] rounded-full ${!selectedCategory ? 'bg-olive border-olive text-white font-semibold' : 'border-line bg-card text-ink2'}`}
+            onClick={() => onSelectCategory('')}
+          >全部</button>
+          {categories.map(c => {
+            const on = selectedCategory === c.name;
+            return (
+              <button
+                key={c.name}
+                className={`shrink-0 border text-[12.5px] px-3.5 py-[7px] rounded-full ${on ? 'bg-olive border-olive text-white font-semibold' : 'border-line bg-card text-ink2'}`}
+                onClick={() => onSelectCategory(on ? '' : c.name)}
+              >{c.name}<span className="opacity-60 ml-0.5">{c.count}</span></button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex gap-2 overflow-x-auto no-scrollbar px-0.5 pb-4 md:flex-wrap">
         <button

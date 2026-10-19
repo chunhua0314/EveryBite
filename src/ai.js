@@ -35,6 +35,7 @@ function normalizeRecipeJson(obj, fallbackTitle) {
     title: String(obj.title || fallbackTitle || '').trim(),
     subtitle: String(obj.subtitle || '').trim(),
     summary: String(obj.summary || '').trim(),
+    category: String(obj.category || '').trim(),
     duration: String(obj.duration || '').trim(),
     difficulty: ['简单', '中等', '困难'].includes(obj.difficulty) ? obj.difficulty : '',
     taste: String(obj.taste || '').trim(),
@@ -43,7 +44,7 @@ function normalizeRecipeJson(obj, fallbackTitle) {
     seasonings: toList(obj.seasonings),
     steps,
     notes: String(obj.notes || '').trim(),
-    tags: (Array.isArray(obj.tags) ? obj.tags : []).map(t => String(t).trim()).filter(Boolean).slice(0, 8),
+    tags: (Array.isArray(obj.tags) ? obj.tags : []).map(t => String(t).trim()).filter(Boolean).slice(0, 4),
     insufficient: !!obj.insufficient,
     reason: String(obj.reason || '').trim(),
   };
@@ -81,6 +82,7 @@ ${noteText || '（无）'}`;
   "title": "菜名（简洁，去掉表情和多余修饰）",
   "subtitle": "菜名的英文翻译，全大写，如 COLA CHICKEN WINGS",
   "summary": "一句话简介（口味口感、卖点，30字以内）",
+  "category": "主分类，只能填一个，从常见值中选：川菜/粤菜/湘菜/东北菜/江浙菜/家常菜/汤羹/主食/面点/甜品/饮品/轻食/其他，拿不准填\\"家常菜\\"",
   "duration": "总时长，如 25 分钟",
   "difficulty": "难度，只能是 简单/中等/困难 之一",
   "taste": "口味，如 咸甜/香辣/清淡/酸甜",
@@ -89,7 +91,7 @@ ${noteText || '（无）'}`;
   "seasonings": [{"name": "调料名", "amount": "用量"}],
   "steps": [{"text": "步骤内容", "heat": "火候，如大火/中火/小火，没有就空字符串", "time": "耗时，如3分钟，没有就空字符串"}],
   "notes": "注意事项或技巧，没有就空字符串",
-  "tags": ["建议标签，如 快手菜/减脂/汤/鸡肉 等，2-5个"]
+  "tags": ["精标签，只给2-3个，最多4个：主要食材1-2个（如 豆腐、鸡肉）+ 特征/场景1个（如 下饭、辣、快手、减脂、30分钟），不要给泛泛的标签"]
 }
 3. 食材和调料分开：油盐酱醋、葱姜蒜、香料算调料，其余算食材。
 4. 用量尽量保留原文写法（如"2勺""300g""适量"）。
@@ -167,9 +169,18 @@ function guessTags(title, text) {
   const all = `${title}\n${text}`;
   for (const [tag, re] of TAG_RULES) {
     if (re.test(all)) tags.push(tag);
-    if (tags.length >= 5) break;
+    if (tags.length >= 3) break;
   }
   return tags.length ? tags : ['家常菜'];
+}
+
+function guessCategory(title, text) {
+  const all = `${title || ''}\n${text || ''}`;
+  if (/汤(?!汁)|炖|煲/.test(all)) return '汤羹';
+  if (/甜品|蛋糕|布丁|奶茶|糖水|糕点/.test(all)) return '甜品';
+  if (/面条|馒头|包子|饺子|馄饨|烙饼|煎饼|拌面|炒面|拉面|焖饭|炒饭|盖饭|粥/.test(all)) return '主食';
+  if (/沙拉|轻食|减脂餐/.test(all)) return '轻食';
+  return '家常菜';
 }
 
 function ruleFallback(title, text) {
@@ -262,6 +273,7 @@ function ruleFallback(title, text) {
     title: (title || '').replace(/[🔥🌟✨⭐💥‼️❗️]/g, '').trim().slice(0, 40) || '未命名菜谱',
     subtitle: '',
     summary: '',
+    category: guessCategory(title, text),
     duration, difficulty, taste, main_ingredient,
     ingredients, seasonings, steps,
     notes: notesLines.join('\n'),

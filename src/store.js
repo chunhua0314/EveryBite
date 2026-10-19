@@ -18,6 +18,7 @@ function normalizeRecipe(row, tagNames) {
     title: row.title || '',
     subtitle: row.subtitle || '',
     summary: row.summary || '',
+    category: row.category || '',
     source_url: row.source_url || '',
     cover: row.cover || '',
     cover_local: row.cover_local || '',
@@ -38,7 +39,7 @@ function normalizeRecipe(row, tagNames) {
   };
 }
 
-const RECIPE_COLS = ['title', 'subtitle', 'summary', 'source_url', 'cover', 'cover_local',
+const RECIPE_COLS = ['title', 'subtitle', 'summary', 'category', 'source_url', 'cover', 'cover_local',
   'duration', 'difficulty', 'taste', 'main_ingredient', 'ingredients', 'seasonings',
   'steps', 'notes', 'rating', 'rating_memo', 'raw_text'];
 
@@ -78,7 +79,7 @@ function createSqliteStore() {
   // 老库补列
   const cols = db.prepare(`PRAGMA table_info(recipes)`).all().map(c => c.name);
   const addCol = (name) => { if (!cols.includes(name)) db.exec(`ALTER TABLE recipes ADD COLUMN ${name} TEXT`); };
-  ['subtitle', 'summary', 'cover_local', 'duration', 'difficulty', 'taste', 'main_ingredient'].forEach(addCol);
+  ['subtitle', 'summary', 'cover_local', 'duration', 'difficulty', 'taste', 'main_ingredient', 'category'].forEach(addCol);
 
   const getTagNames = (recipeId) =>
     db.prepare(`SELECT t.name FROM tags t JOIN recipe_tags rt ON rt.tag_id=t.id WHERE rt.recipe_id=? ORDER BY t.name`)
@@ -100,7 +101,7 @@ function createSqliteStore() {
 
   return {
     kind: 'sqlite',
-    list({ tag, q } = {}) {
+    list({ tag, q, category } = {}) {
       let sql = 'SELECT DISTINCT r.* FROM recipes r';
       const params = [];
       const tags = tag ? (Array.isArray(tag) ? tag : String(tag).split(',')).filter(Boolean) : [];
@@ -108,11 +109,17 @@ function createSqliteStore() {
         sql += ` JOIN recipe_tags rt ON rt.recipe_id=r.id JOIN tags t ON t.id=rt.tag_id AND t.name IN (${tags.map(() => '?').join(',')})`;
         params.push(...tags);
       }
+      const conds = [];
+      if (category) {
+        conds.push('r.category = ?');
+        params.push(String(category));
+      }
       if (q) {
-        sql += ` WHERE (r.title LIKE ? OR r.ingredients LIKE ? OR r.seasonings LIKE ?)`;
+        conds.push(`(r.title LIKE ? OR r.ingredients LIKE ? OR r.seasonings LIKE ?)`);
         const like = `%${q}%`;
         params.push(like, like, like);
       }
+      if (conds.length) sql += ` WHERE ${conds.join(' AND ')}`;
       sql += ' ORDER BY r.updated_at DESC';
       return db.prepare(sql).all(...params).map(r => normalizeRecipe(r, getTagNames(r.id)));
     },
@@ -152,6 +159,9 @@ function createSqliteStore() {
     listTags() {
       return db.prepare('SELECT name FROM tags ORDER BY name').all().map(r => r.name);
     },
+    listCategories() {
+      return db.prepare(`SELECT category AS name, COUNT(*) AS count FROM recipes WHERE category IS NOT NULL AND category != '' GROUP BY category ORDER BY count DESC, name`).all();
+    },
     // ---- 素材库 ----
     listAssets(category) {
       if (category) {
@@ -183,9 +193,10 @@ function createJsonStore() {
 
   return {
     kind: 'json',
-    list({ tag, q } = {}) {
+    list({ tag, q, category } = {}) {
       const tags = tag ? (Array.isArray(tag) ? tag : String(tag).split(',')).filter(Boolean) : [];
       let rows = state.recipes.slice();
+      if (category) rows = rows.filter(r => r.category === String(category));
       if (tags.length) rows = rows.filter(r => tags.some(t => (r.tags || []).includes(t)));
       if (q) {
         const s = String(q).toLowerCase();
@@ -203,7 +214,7 @@ function createJsonStore() {
       const t = now();
       const recipe = {
         id: ++state.seq,
-        title: '', subtitle: '', summary: '', source_url: '', cover: '', cover_local: '',
+        title: '', subtitle: '', summary: '', category: '', source_url: '', cover: '', cover_local: '',
         duration: '', difficulty: '', taste: '', main_ingredient: '',
         ingredients: [], seasonings: [], steps: [], notes: '', rating: 0,
         rating_memo: '', raw_text: '', tags: [], created_at: t, updated_at: t,
@@ -234,6 +245,13 @@ function createJsonStore() {
       const set = new Set();
       state.recipes.forEach(r => (r.tags || []).forEach(t => set.add(t)));
       return [...set].sort();
+    },
+    listCategories() {
+      const counts = {};
+      state.recipes.forEach(r => { if (r.category) counts[r.category] = (counts[r.category] || 0) + 1; });
+      return Object.entries(counts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
     },
     listAssets(category) {
       let rows = state.assets.slice();

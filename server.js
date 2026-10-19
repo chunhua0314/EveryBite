@@ -72,13 +72,20 @@ app.post('/api/parse', async (req, res) => {
       text: noteText,
       referenceText: referenceText ? String(referenceText) : '',
     });
+    // 笔记自带标签只作补充：不与 AI 标签重复、总数不超 4，避免标签爆炸
     if (noteTags.length) {
-      recipe.tags = [...new Set([...recipe.tags, ...noteTags])].slice(0, 8);
+      const merged = [...recipe.tags];
+      for (const t of noteTags) {
+        if (merged.length >= 4) break;
+        if (!merged.includes(t)) merged.push(t);
+      }
+      recipe.tags = merged;
     }
     res.json({
       title: recipe.title,
       subtitle: recipe.subtitle,
       summary: recipe.summary,
+      category: recipe.category,
       duration: recipe.duration,
       difficulty: recipe.difficulty,
       taste: recipe.taste,
@@ -103,8 +110,8 @@ app.post('/api/parse', async (req, res) => {
 });
 
 app.get('/api/recipes', (req, res) => {
-  const { tag, q } = req.query;
-  res.json(store.list({ tag, q }));
+  const { tag, q, category } = req.query;
+  res.json(store.list({ tag, q, category }));
 });
 
 app.get('/api/recipes/:id', (req, res) => {
@@ -123,7 +130,7 @@ app.post('/api/recipes', (req, res) => {
 });
 
 app.patch('/api/recipes/:id', (req, res) => {
-  const allowed = ['title', 'subtitle', 'summary', 'source_url', 'cover', 'cover_local',
+  const allowed = ['title', 'subtitle', 'summary', 'category', 'source_url', 'cover', 'cover_local',
     'duration', 'difficulty', 'taste', 'main_ingredient',
     'ingredients', 'seasonings', 'steps', 'notes', 'rating', 'rating_memo', 'raw_text', 'tags'];
   const patch = {};
@@ -143,6 +150,10 @@ app.delete('/api/recipes/:id', (req, res) => {
 
 app.get('/api/tags', (req, res) => {
   res.json(store.listTags());
+});
+
+app.get('/api/categories', (req, res) => {
+  res.json(store.listCategories());
 });
 
 // ---------- 素材库 ----------

@@ -78,6 +78,8 @@ export default function Detail({ id, onBack, onDeleted, onError, toast }) {
   const [notes, setNotes] = useState('');
   const [editingStep, setEditingStep] = useState(-1);
   const [showCoverPicker, setShowCoverPicker] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(false);
+  const [categoryText, setCategoryText] = useState('');
 
   useEffect(() => {
     api.getRecipe(id).then(r => {
@@ -152,11 +154,37 @@ export default function Detail({ id, onBack, onDeleted, onError, toast }) {
           <h1 className="font-serif text-[30px] font-extrabold text-ink mt-1 mb-0.5">{recipe.title}</h1>
           <div className="text-[11px] text-muted tracking-[2.5px] mb-3">{recipe.subtitle || ''}</div>
           {recipe.summary && <p className="text-[13px] text-ink2 leading-[1.9] mb-3.5">{recipe.summary}</p>}
-          <TagEditor
-            tags={recipe.tags || []}
-            onChange={tags => patch({ tags }, true)}
-            addPlaceholder="＋"
-          />
+          <div className="flex gap-1.5 flex-wrap items-center">
+            {editingCategory ? (
+              <input
+                autoFocus
+                value={categoryText}
+                onChange={e => setCategoryText(e.target.value)}
+                onBlur={() => {
+                  setEditingCategory(false);
+                  const v = categoryText.trim();
+                  if (v !== (recipe.category || '')) patch({ category: v }, true);
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') e.target.blur();
+                  if (e.key === 'Escape') setEditingCategory(false);
+                }}
+                className="text-xs border border-olive rounded-full px-3 py-1 outline-none w-24 bg-white text-olive font-semibold"
+                placeholder="如 川菜"
+              />
+            ) : (
+              <button
+                className="text-xs font-semibold rounded-full px-3 py-1 bg-olive text-white"
+                onClick={() => { setCategoryText(recipe.category || ''); setEditingCategory(true); }}
+                title="点击编辑主分类"
+              >{recipe.category || '＋ 主分类'}</button>
+            )}
+            <TagEditor
+              tags={recipe.tags || []}
+              onChange={tags => patch({ tags }, true)}
+              addPlaceholder="＋"
+            />
+          </div>
           {inlineStats.length > 0 && (
             <div className="hidden md:flex flex-wrap mt-3.5 text-[12.5px] text-ink2">
               {inlineStats.map((s, i) => (

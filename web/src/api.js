@@ -13,6 +13,7 @@ export const api = {
   listRecipes: (params = {}) => {
     const sp = new URLSearchParams();
     if (params.q) sp.set('q', params.q);
+    if (params.category) sp.set('category', params.category);
     if (params.tags && params.tags.length) sp.set('tag', params.tags.join(','));
     const qs = sp.toString();
     return request(`/api/recipes${qs ? `?${qs}` : ''}`);
@@ -22,6 +23,7 @@ export const api = {
   updateRecipe: (id, patch) => request(`/api/recipes/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   deleteRecipe: (id) => request(`/api/recipes/${id}`, { method: 'DELETE' }),
   listTags: () => request('/api/tags'),
+  listCategories: () => request('/api/categories'),
   listAssets: (category) => request(`/api/assets${category ? `?category=${encodeURIComponent(category)}` : ''}`),
   setCover: (id, body) => request(`/api/recipes/${id}/cover`, { method: 'POST', body: JSON.stringify(body) }),
 };
