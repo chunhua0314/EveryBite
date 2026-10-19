@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>菜谱卡 App · UI 设计参考 v2（杂志风）</title>
+<style>
+  :root{
+    --olive:#5F7050; --olive-soft:#EEF0E8; --olive-line:#D9DDCF;
+    --bg:#F4F2EC; --card:#FDFCF9;
+    --ink:#2B2B26; --ink2:#5A5A50; --muted:#9B9B8E;
+    --gold:#C9A24B; --gold-off:#E3DDC9; --line:#EAE7DC;
+    --tweak-bg:#FFF8E6; --tweak-bar:#C9A24B;
+    --serif:"Noto Serif SC","Songti SC","STSong","SimSun",Georgia,serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+  body{background:#E9E7E0;min-height:100vh;display:flex;flex-direction:column}
+
+  .mockbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;flex-wrap:wrap}
+  .mockbar h1{font-size:15px;color:var(--ink2);font-weight:600}
+  .mockbar h1 span{color:var(--muted);font-weight:400;font-size:12px;margin-left:8px}
+  .mode-btns{display:flex;background:var(--card);border-radius:999px;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  .mode-btns button{border:0;background:transparent;padding:7px 18px;border-radius:999px;font-size:13px;cursor:pointer;color:var(--ink2)}
+  .mode-btns button.on{background:var(--olive);color:#fff;font-weight:600}
+
+  .stage{flex:1;display:flex;justify-content:center;align-items:flex-start;padding:0 12px 8px}
+  .device{background:var(--bg);overflow:hidden;transition:width .25s,border-radius .25s;display:flex}
+  body.mobile .device{width:390px;height:min(812px,calc(100vh - 150px));border-radius:42px;border:10px solid #23231f;box-shadow:0 24px 60px rgba(0,0,0,.25)}
+  body.desktop .device{width:min(1240px,97vw);height:calc(100vh - 130px);min-height:620px;border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.15)}
+
+  .app{flex:1;display:flex;position:relative;background:var(--bg);min-width:0}
+
+  .sidebar{display:none;width:212px;background:var(--card);border-right:1px solid var(--line);flex-direction:column;padding:24px 14px;flex-shrink:0}
+  body.desktop .sidebar{display:flex}
+  .sidebar .logo{font-family:var(--serif);font-size:20px;font-weight:800;color:var(--ink);padding:0 10px 4px}
+  .sidebar .logo-sub{font-size:10px;color:var(--muted);letter-spacing:2px;padding:0 10px 20px}
+  .side-nav{display:flex;flex-direction:column;gap:4px}
+  .side-nav button{border:0;background:transparent;text-align:left;padding:11px 12px;border-radius:12px;font-size:14px;color:var(--ink2);cursor:pointer;display:flex;gap:10px;align-items:center}
+  .side-nav button.on{background:var(--olive-soft);color:var(--olive);font-weight:600}
+  .side-tags{margin-top:24px;padding:0 10px}
+  .side-tags h4{font-size:12px;color:var(--muted);margin-bottom:10px;font-weight:500}
+  .side-tags .stag{display:inline-block;margin:0 6px 8px 0;font-size:12px;color:var(--ink2);background:var(--bg);padding:5px 10px;border-radius:999px;cursor:pointer}
+  .side-tags .stag.on{background:var(--olive);color:#fff}
+
+  .main{flex:1;overflow-y:auto;padding:0 16px 96px;min-width:0}
+  body.desktop .main{padding:26px 34px 44px}
+
+  .tabbar{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;padding:8px 0 calc(10px + env(safe-area-inset-bottom))}
+  body.desktop .tabbar{display:none}
+  .tabbar button{flex:1;border:0;background:transparent;font-size:11px;color:var(--muted);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px}
+  .tabbar button i{font-style:normal;font-size:20px}
+  .tabbar button.on{color:var(--olive);font-weight:600}
+
+  .page-head{display:flex;align-items:baseline;justify-content:space-between;padding:20px 2px 14px}
+  .page-head h2{font-family:var(--serif);font-size:24px;font-weight:800;color:var(--ink)}
+  .page-head .count{font-size:12px;color:var(--muted)}
+  .back-btn{border:0;background:var(--card);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--ink2);cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.05);align-self:center}
+  .search{display:flex;align-items:center;gap:8px;background:var(--card);border-radius:999px;padding:11px 16px;font-size:13px;color:var(--muted);box-shadow:0 1px 4px rgba(0,0,0,.04);margin-bottom:12px}
+  .tagbar{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 16px;scrollbar-width:none}
+  body.desktop .tagbar{flex-wrap:wrap}
+  .chip{flex-shrink:0;border:1px solid var(--line);background:var(--card);color:var(--ink2);font-size:12.5px;padding:7px 14px;border-radius:999px;cursor:pointer}
+  .chip.on{background:var(--olive);border-color:var(--olive);color:#fff;font-weight:600}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  body.desktop .grid{grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:var(--card);border-radius:18px;overflow:hidden;cursor:pointer;box-shadow:0 2px 8px rgba(60,60,40,.05);transition:transform .15s,box-shadow .15s}
+  body.desktop .card:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(60,60,40,.12)}
+  .cover{aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;font-size:42px;position:relative}
+  .cover .no{position:absolute;top:8px;left:12px;font-family:var(--serif);font-size:15px;color:rgba(43,43,38,.35);font-weight:700}
+  .card .body{padding:11px 13px 13px}
+  .card .name{font-family:var(--serif);font-size:15px;font-weight:700;color:var(--ink);margin-bottom:6px}
+  .card .mini-tags{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:7px}
+  .mtag{font-size:10.5px;color:var(--olive);background:var(--olive-soft);border-radius:999px;padding:2.5px 8px}
+  .stars{font-size:13px;letter-spacing:1px;color:var(--gold-off)}
+  .stars b{color:var(--gold);font-weight:400}
+
+  .btn{border:0;background:var(--olive);color:#fff;font-size:15px;font-weight:600;padding:13px 26px;border-radius:999px;cursor:pointer;box-shadow:0 6px 16px rgba(95,112,80,.28)}
+  .btn.ghost{background:var(--card);color:var(--ink2);box-shadow:0 1px 4px rgba(0,0,0,.07)}
+  .btn.block{width:100%;padding:14px}
+
+  .panel{background:var(--card);border-radius:18px;padding:20px;box-shadow:0 2px 8px rgba(60,60,40,.05)}
+  body.desktop .narrow{max-width:640px;margin:0 auto}
+  .add-tabs{display:flex;background:var(--bg);border-radius:12px;padding:4px;margin-bottom:16px}
+  .add-tabs button{flex:1;border:0;background:transparent;padding:10px;border-radius:9px;font-size:14px;color:var(--ink2);cursor:pointer}
+  .add-tabs button.on{background:var(--card);color:var(--olive);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+  .input,.textarea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:13px 14px;font-size:14px;outline:none;background:#fff;color:var(--ink)}
+  .input:focus,.textarea:focus{border-color:var(--olive)}
+  .textarea{min-height:120px;resize:vertical;line-height:1.7;margin-top:10px}
+  .hint{font-size:12px;color:var(--muted);margin:10px 2px 16px;line-height:1.7}
+  .progress{display:none;align-items:center;gap:10px;margin-top:14px;font-size:13px;color:var(--ink2)}
+  .progress.show{display:flex}
+  .spinner{width:16px;height:16px;border:2.5px solid var(--olive-line);border-top-color:var(--olive);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ===== 详情页（杂志风） ===== */
+  .detail-cols{display:block}
+  body.desktop .detail-cols{display:grid;grid-template-columns:370px 1fr;gap:20px;
+    grid-template-areas:"hero rating" "ing steps" "season steps" "notes steps" "foot foot"}
+  .d-card{background:var(--card);border-radius:18px;box-shadow:0 2px 8px rgba(60,60,40,.05);padding:18px;margin-bottom:14px}
+  body.desktop .d-card{margin-bottom:0}
+  body.desktop .a-hero{grid-area:hero}
+  body.desktop .a-stats{display:none}   /* 电脑端不显示大信息条，用头部卡片内的紧凑行代替 */
+  body.desktop .a-ing{grid-area:ing} body.desktop .a-season{grid-area:season}
+  body.desktop .a-notes{grid-area:notes} body.desktop .a-rating{grid-area:rating}
+  body.desktop .a-steps{grid-area:steps} body.desktop .a-foot{grid-area:foot}
+
+  /* 电脑端：信息条收进头部卡片，一行紧凑小字 */
+  .stats-inline{display:none;flex-wrap:wrap;margin:14px 0 0;font-size:12.5px;color:var(--ink2)}
+  .stats-inline span{padding-right:10px;margin-right:10px;border-right:1px solid var(--line);white-space:nowrap}
+  .stats-inline span:last-child{border-right:0;margin-right:0;padding-right:0}
+  body.desktop .stats-inline{display:flex}
+
+  .hero{padding:26px 20px 20px;position:relative;overflow:hidden}
+  .hero .big-no{font-family:var(--serif);font-size:44px;font-weight:800;color:var(--olive-line);line-height:1}
+  .hero h1{font-family:var(--serif);font-size:30px;font-weight:800;color:var(--ink);margin:4px 0 2px}
+  .hero .en{font-size:11px;color:var(--muted);letter-spacing:2.5px;margin-bottom:12px}
+  .hero .summary{font-size:13px;color:var(--ink2);line-height:1.9;margin-bottom:14px}
+  .d-cover{border-radius:14px;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;font-size:56px;margin-top:14px;background:linear-gradient(135deg,#EDE8DB,#E3E7D8)}
+  .d-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .d-tag{font-size:12px;color:var(--olive);background:var(--olive-soft);border-radius:999px;padding:4px 11px}
+  .d-tag.add{color:var(--muted);background:transparent;border:1px dashed var(--olive-line)}
+
+  .stats{display:flex;justify-content:space-between;text-align:center;padding:14px 8px}
+  .stat{flex:1}
+  .stat .ic{font-size:15px;margin-bottom:5px}
+  .stat .lb{font-size:10.5px;color:var(--muted);margin-bottom:3px}
+  .stat .vl{font-size:13.5px;font-weight:700;color:var(--ink)}
+  .stat+.stat{border-left:1px solid var(--line)}
+
+  .sec-title{font-family:var(--serif);font-size:17px;font-weight:800;color:var(--ink);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .sec-title .sub{font-size:11px;color:var(--muted);font-weight:400;font-family:sans-serif}
+
+  /* 折叠面板 */
+  .acc-head{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+  .acc-head .arrow{color:var(--muted);font-size:12px;transition:transform .2s}
+  .acc.open .acc-head .arrow{transform:rotate(180deg)}
+  .acc-head .cnt{font-size:11px;color:var(--muted);font-weight:400}
+  .acc-body{display:none;padding-top:12px}
+  .acc.open .acc-body{display:block}
+
+  table.list{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.list td{padding:8px 2px;border-bottom:1px solid #F2F0E8;color:var(--ink2)}
+  table.list tr:last-child td{border-bottom:0}
+  table.list td:last-child{text-align:right;color:var(--ink);font-weight:600;white-space:nowrap}
+
+  /* 时间轴步骤 */
+  .steps{position:relative;padding-left:6px}
+  .steps::before{content:"";position:absolute;left:18px;top:14px;bottom:14px;width:2px;background:var(--olive-soft)}
+  .step{position:relative;display:flex;gap:14px;padding:11px 0}
+  .step .no{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:var(--olive);color:#fff;font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
+  .step .txt{flex:1}
+  .step .st{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:3px}
+  .step .sd{font-size:13px;color:var(--ink2);line-height:1.75}
+  .step .tm{flex-shrink:0;font-size:12px;color:var(--muted);padding-top:3px;white-space:nowrap}
+  .badges{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+  .badge{font-size:11px;color:var(--olive);background:var(--olive-soft);border-radius:6px;padding:3px 8px}
+  .tweak{margin-top:8px;background:var(--tweak-bg);border-left:3px solid var(--tweak-bar);border-radius:0 10px 10px 0;padding:8px 11px;font-size:12.5px;color:#8a6d1a;line-height:1.6}
+  .tweak b{font-size:11px;color:#B78A00}
+  .tweak-add{margin-top:8px;border:0;background:transparent;color:var(--muted);font-size:12px;cursor:pointer;padding:2px 0}
+  .tweak-add:hover{color:var(--olive)}
+
+  .rate-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .rate-row .stars{font-size:26px;cursor:pointer}
+  .rate-memo{width:100%;border:0;background:var(--bg);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--ink2);outline:none}
+  .notes-box{width:100%;border:0;background:#FBF7E9;border-radius:12px;padding:13px 14px;font-size:13.5px;line-height:1.8;color:var(--ink2);outline:none;min-height:70px;resize:vertical}
+  .d-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .src-link{font-size:12.5px;color:var(--olive);text-decoration:none}
+  .del-btn{border:0;background:transparent;color:#C9C9BC;font-size:12.5px;cursor:pointer}
+  .del-btn:hover{color:#C0492F}
+
+  .toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-80px);background:#2B2B26;color:#fff;font-size:13px;padding:11px 22px;border-radius:999px;transition:transform .3s;z-index:99;opacity:.95}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .specbar{padding:10px 22px 20px;text-align:center;font-size:12px;color:#9B9B8E;line-height:1.9}
+  .specbar b{color:#6E6E60}
+</style>
+</head>
+<body class="mobile">
+
+<div class="mockbar">
+  <h1>菜谱卡 App · UI 设计参考 v2<span>杂志风；手机端食材/调料默认折叠，步骤优先</span></h1>
+  <div class="mode-btns">
+    <button id="m-mobile" class="on" onclick="setMode('mobile')">📱 手机</button>
+    <button id="m-desktop" onclick="setMode('desktop')">💻 电脑</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="device">
+    <div class="app">
+
+      <aside class="sidebar">
+        <div class="logo">我的菜谱</div>
+        <div class="logo-sub">MY RECIPE BOOK</div>
+        <div class="side-nav">
+          <button class="on" onclick="go('home')">🏠 菜谱库</button>
+          <button onclick="go('add')">➕ 添加菜谱</button>
+        </div>
+        <div class="side-tags">
+          <h4>全部标签</h4>
+          <span class="stag on">全部</span><span class="stag">减脂</span><span class="stag">快手菜</span>
+          <span class="stag">荤菜</span><span class="stag">素菜</span><span class="stag">汤</span><span class="stag">下饭</span>
+        </div>
+      </aside>
+
+      <div class="main">
+
+        <!-- ===== 首页 ===== -->
+        <section class="screen" id="s-home">
+          <div class="page-head"><h2>我的菜谱</h2><span class="count">共 6 道</span></div>
+          <div class="search">🔍 搜索菜名 / 食材，如「鸡翅」</div>
+          <div class="tagbar">
+            <button class="chip on">全部</button><button class="chip">减脂</button>
+            <button class="chip">快手菜</button><button class="chip">荤菜</button>
+            <button class="chip">素菜</button><button class="chip">汤</button><button class="chip">下饭</button>
+          </div>
+          <div class="grid">
+            <div class="card" onclick="go('detail')">
+              <div class="cover" style="background:linear-gradient(135deg,#F0E6D2,#E8DCC8)"><span class="no">01</span>🍗</div>
+              <div class="body"><div class="name">可乐鸡翅</div>
+                <div class="mini-tags"><span class="mtag">荤菜</span><span class="mtag">下饭</span></div>
+                <div class="stars"><b>★★★★</b>★</div></div>
+            </div>
+            <div class="card" onclick="go('detail')">
+              <div class="cover" style="background:linear-gradient(135deg,#F2D7D5,#EBD5CB)"><span class="no">02</span>🍅</div>
+              <div class="body"><div class="name">番茄牛腩</div>
+                <div class="mini-tags"><span class="mtag">荤菜</span><span class="mtag">下饭</span></div>
+                <div class="stars"><b>★★★★★</b></div></div>
+            </div>
+            <div class="card" onclick="go('detail')">
+              <div class="cover" style="background:linear-gradient(135deg,#DCE5D2,#E4E9D6)"><span class="no">03</span>🥦</div>
+              <div class="body"><div class="name">蒜蓉西兰花</div>
+                <div class="mini-tags"><span class="mtag">素菜</span><span class="mtag">快手菜</span></div>
+                <div class="stars">★★★★★</div></div>
+            </div>
+            <div class="card" onclick="go('detail')">
+              <div class="cover" style="background:linear-gradient(135deg,#D8E4E0,#DCE8E4)"><span class="no">04</span>🥗</div>
+              <div class="body"><div class="name">鸡胸肉沙拉</div>
+                <div class="mini-tags"><span class="mtag">减脂</span><span class="mtag">快手菜</span></div>
+                <div class="stars"><b>★★★</b>★★</div></div>
+            </div>
+            <div class="card" onclick="go('detail')">
+              <div class="cover" style="background:linear-gradient(135deg,#F2E3C8,#EDDCC4)"><span class="no">05</span>🍲</div>
+              <div class="body"><div class="name">酸辣汤</div>
+                <div class="mini-tags"><span class="mtag">汤</span></div>
+                <div class="stars">★★★★★</div></div>
+            </div>
+            <div class="card" onclick="go('detail')">
+              <div class="cover" style="background:linear-gradient(135deg,#F5EBCB,#EFE3C0)"><span class="no">06</span>🍟</div>
+              <div class="body"><div class="name">空气炸锅薯角</div>
+                <div class="mini-tags"><span class="mtag">快手菜</span><span class="mtag">素菜</span></div>
+                <div class="stars"><b>★★★★</b>★</div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 添加页 ===== -->
+        <section class="screen" id="s-add" hidden>
+          <div class="page-head"><h2>添加菜谱</h2></div>
+          <div class="narrow">
+            <div class="panel">
+              <div class="add-tabs">
+                <button class="on" id="tab-link" onclick="addTab('link')">🔗 粘贴链接</button>
+                <button id="tab-text" onclick="addTab('text')">📝 粘贴文字</button>
+              </div>
+              <div id="pane-link">
+                <input class="input" value="https://xhslink.cn/o/Ab3dEf9x" placeholder="粘贴小红书做饭笔记链接">
+                <p class="hint">在小红书笔记右上角点「分享 → 复制链接」，回到这里粘贴。封面会自动保存到本地素材库。</p>
+                <button class="btn block" onclick="fakeParse()">生成菜谱卡</button>
+                <div class="progress" id="prog"><span class="spinner"></span><span id="prog-txt">正在读取小红书笔记…</span></div>
+              </div>
+              <div id="pane-text" hidden>
+                <input class="input" placeholder="菜名，如：可乐鸡翅">
+                <textarea class="textarea" placeholder="把笔记里的做法文字粘贴到这里：食材、调料、步骤……"></textarea>
+                <p class="hint">适合纯视频笔记：在笔记文案里长按复制文字，粘贴过来即可整理。</p>
+                <button class="btn block" onclick="fakeParse()">生成菜谱卡</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 生成预览页 ===== -->
+        <section class="screen" id="s-preview" hidden>
+          <div class="page-head">
+            <button class="back-btn" onclick="go('add')">‹ 返回</button>
+            <span class="count">已生成，请确认</span>
+          </div>
+          <div class="narrow">
+            <div class="d-card hero a-hero">
+              <div class="big-no">07</div>
+              <h1>可乐鸡翅</h1>
+              <div class="en">COLA CHICKEN WINGS</div>
+              <p class="summary">咸甜适口，酱汁浓郁。鸡翅滑嫩，收汁后裹着亮泽的糖浆色，下饭一绝。</p>
+              <div class="d-tags">
+                <span class="d-tag">荤菜 ✕</span><span class="d-tag">下饭 ✕</span>
+                <span class="d-tag add">＋ 添加标签</span>
+              </div>
+              <div class="d-cover">🍗<span style="position:absolute;bottom:8px;right:12px;font-size:10px;color:var(--muted)">封面已存本地</span></div>
+            </div>
+            <div class="d-card">
+              <div class="sec-title">整理结果 <span class="sub">保存后可随时调整</span></div>
+              <table class="list">
+                <tr><td>食材</td><td>4 项</td></tr>
+                <tr><td>调料</td><td>4 项</td></tr>
+                <tr><td>步骤</td><td>6 步 · 约 25 分钟</td></tr>
+              </table>
+            </div>
+            <div style="display:flex;gap:10px">
+              <button class="btn ghost" style="flex:1" onclick="toast('已重新整理（示意）')">↻ 重新整理</button>
+              <button class="btn" style="flex:2" onclick="toast('已保存到菜谱库 🎉');go('home')">保存到菜谱库</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== 详情页 ===== -->
+        <section class="screen" id="s-detail" hidden>
+          <div class="page-head">
+            <button class="back-btn" onclick="go('home')">‹ 返回</button>
+            <span class="count">2026-10-10 收藏</span>
+          </div>
+          <div class="detail-cols">
+
+            <div class="d-card hero a-hero">
+              <div class="big-no">01</div>
+              <h1>可乐鸡翅</h1>
+              <div class="en">COLA CHICKEN WINGS</div>
+              <p class="summary">咸甜适口，酱汁浓郁。鸡翅滑嫩，收汁后裹着亮泽的糖浆色，下饭一绝。</p>
+              <div class="d-tags">
+                <span class="d-tag">荤菜</span><span class="d-tag">下饭</span><span class="d-tag add">＋</span>
+              </div>
+              <div class="stats-inline">
+                <span>⏱ 25 分钟</span><span>📶 简单</span><span>🌶 咸甜</span><span>🍗 鸡肉</span><span>⭐ 4 星</span>
+              </div>
+              <div class="d-cover">🍗</div>
+            </div>
+
+            <div class="d-card stats a-stats">
+              <div class="stat"><div class="ic">⏱</div><div class="lb">总时长</div><div class="vl">25 分钟</div></div>
+              <div class="stat"><div class="ic">📶</div><div class="lb">难度</div><div class="vl">简单</div></div>
+              <div class="stat"><div class="ic">🌶</div><div class="lb">口味</div><div class="vl">咸甜</div></div>
+              <div class="stat"><div class="ic">🍗</div><div class="lb">主食材</div><div class="vl">鸡肉</div></div>
+              <div class="stat"><div class="ic">⭐</div><div class="lb">我的评分</div><div class="vl">4 星</div></div>
+            </div>
+
+            <div class="d-card a-rating">
+              <div class="sec-title">我的评价</div>
+              <div class="rate-row">
+                <span class="stars" id="rate"><b>★★★★</b>★</span>
+                <span style="font-size:12px;color:var(--muted)">点星星评分</span>
+              </div>
+              <input class="rate-memo" value="有点甜，下次少放半勺糖" placeholder="做完后来记一句感受…">
+            </div>
+
+            <div class="d-card a-steps">
+              <div class="sec-title">烹饪步骤 <span class="sub">6 步 · 约 25 分钟</span></div>
+              <div class="steps">
+                <div class="step"><div class="no">1</div><div class="txt">
+                  <div class="st">焯水去腥</div>
+                  <div class="sd">鸡翅两面各划两刀，冷水下锅，放姜片和料酒。</div>
+                  <div class="badges"><span class="badge">⏱ 5 分钟</span></div>
+                </div><div class="tm">5 分钟</div></div>
+                <div class="step"><div class="no">2</div><div class="txt">
+                  <div class="st">洗净沥干</div>
+                  <div class="sd">捞出用温水洗净，沥干水分备用。</div>
+                </div></div>
+                <div class="step"><div class="no">3</div><div class="txt">
+                  <div class="st">煎至金黄</div>
+                  <div class="sd">锅中少许油，鸡翅煎至两面金黄。</div>
+                  <div class="badges"><span class="badge">🔥 中小火</span><span class="badge">⏱ 4 分钟</span></div>
+                  <div class="tweak"><b>我的调整：</b>我家不粘锅可以不放油，鸡皮自己会出油。</div>
+                </div><div class="tm">4 分钟</div></div>
+                <div class="step"><div class="no">4</div><div class="txt">
+                  <div class="st">加可乐煮开</div>
+                  <div class="sd">加生抽、老抽翻炒上色，倒入可乐没过鸡翅，大火煮开。</div>
+                  <div class="badges"><span class="badge">🔥 大火</span></div>
+                </div></div>
+                <div class="step"><div class="no">5</div><div class="txt">
+                  <div class="st">焖煮入味</div>
+                  <div class="sd">转中小火，盖盖焖煮。</div>
+                  <div class="badges"><span class="badge">🔥 中小火</span><span class="badge">⏱ 15 分钟</span></div>
+                </div><div class="tm">15 分钟</div></div>
+                <div class="step"><div class="no">6</div><div class="txt">
+                  <div class="st">收汁出锅</div>
+                  <div class="sd">开盖大火收汁，汤汁浓稠裹住鸡翅即可。</div>
+                  <div class="badges"><span class="badge">🔥 大火</span><span class="badge">⏱ 3 分钟</span></div>
+                  <div class="tweak"><b>我的调整：</b>我家灶火小，收汁要约 5 分钟，别走开。</div>
+                  <button class="tweak-add" onclick="toast('编辑这条调整（示意）')">✏️ 编辑调整</button>
+                </div><div class="tm">3 分钟</div></div>
+              </div>
+            </div>
+
+            <div class="d-card acc a-ing">
+              <div class="acc-head" onclick="toggleAcc(this)">
+                <div class="sec-title" style="margin:0">食材准备 <span class="cnt">4 项</span></div>
+                <span class="arrow">▼</span>
+              </div>
+              <div class="acc-body">
+                <table class="list">
+                  <tr><td>鸡翅中</td><td>500g</td></tr>
+                  <tr><td>可乐（原味）</td><td>330ml</td></tr>
+                  <tr><td>姜</td><td>3 片</td></tr>
+                  <tr><td>葱</td><td>1 根</td></tr>
+                </table>
+              </div>
+            </div>
+
+            <div class="d-card acc a-season">
+              <div class="acc-head" onclick="toggleAcc(this)">
+                <div class="sec-title" style="margin:0">调味料 <span class="cnt">4 项</span></div>
+                <span class="arrow">▼</span>
+              </div>
+              <div class="acc-body">
+                <table class="list">
+                  <tr><td>生抽</td><td>2 勺</td></tr>
+                  <tr><td>老抽</td><td>1 勺</td></tr>
+                  <tr><td>料酒</td><td>1 勺</td></tr>
+                  <tr><td>盐</td><td>少许</td></tr>
+                </table>
+              </div>
+            </div>
+
+            <div class="d-card a-notes">
+              <div class="sec-title">注意事项</div>
+              <textarea class="notes-box">收汁时一定要盯着锅，糖分多容易糊。可乐要用原味的，无糖可乐不出焦糖色。</textarea>
+            </div>
+
+            <div class="d-card a-foot">
+              <div class="d-foot">
+                <a class="src-link" href="#" onclick="toast('跳转到原始小红书笔记（示意）');return false">🔗 查看原始小红书笔记</a>
+                <button class="del-btn" onclick="toast('删除前会二次确认（示意）')">删除菜谱</button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+
+      <nav class="tabbar">
+        <button class="on" onclick="go('home')"><i>🏠</i>菜谱库</button>
+        <button onclick="go('add')"><i>➕</i>添加</button>
+      </nav>
+
+    </div>
+  </div>
+</div>
+
+<div class="specbar">
+  <b>封面策略：</b>① 抓小红书原封面存本地（默认，零成本）→ ② 本地素材库按主食材匹配 → ③ 杂志风排版占位卡 → ④ AI 生图仅手动触发且入库复用<br>
+  <b>视觉规范：</b>米白 #F4F2EC · 橄榄绿 #5F7050 · 衬线大标题 + 英文副标题 · 暖金星级 #C9A24B · 手机端食材/调料折叠、步骤优先
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function setMode(m){
+  document.body.className = m;
+  document.getElementById('m-mobile').classList.toggle('on', m==='mobile');
+  document.getElementById('m-desktop').classList.toggle('on', m==='desktop');
+  // 电脑端默认展开折叠面板，手机端默认折叠
+  document.querySelectorAll('.acc').forEach(a=>a.classList.toggle('open', m==='desktop'));
+}
+function toggleAcc(head){ head.closest('.acc').classList.toggle('open'); }
+function go(name){
+  ['home','add','preview','detail'].forEach(s=>{ document.getElementById('s-'+s).hidden = (s!==name); });
+  document.querySelector('.main').scrollTop = 0;
+  const navName = (name==='add'||name==='preview') ? 'add' : 'home';
+  document.querySelectorAll('.tabbar button').forEach((b,i)=>b.classList.toggle('on', (i===0)===(navName==='home')));
+  document.querySelectorAll('.side-nav button').forEach((b,i)=>b.classList.toggle('on', (i===0)===(navName==='home')));
+  if(name==='detail' && document.body.className==='mobile'){
+    document.querySelectorAll('.acc').forEach(a=>a.classList.remove('open')); // 确保手机端折叠
+  }
+}
+function addTab(t){
+  document.getElementById('tab-link').classList.toggle('on', t==='link');
+  document.getElementById('tab-text').classList.toggle('on', t==='text');
+  document.getElementById('pane-link').hidden = t!=='link';
+  document.getElementById('pane-text').hidden = t!=='text';
+}
+function fakeParse(){
+  const p = document.getElementById('prog'), t = document.getElementById('prog-txt');
+  if(p){ p.classList.add('show'); t.textContent='正在读取小红书笔记…'; }
+  setTimeout(()=>{ if(t) t.textContent='AI 正在整理食材 / 步骤 / 火候…'; }, 900);
+  setTimeout(()=>{ if(p) p.classList.remove('show'); go('preview'); }, 1800);
+}
+let toastTimer;
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('show'), 1800);
+}
+document.getElementById('rate').addEventListener('click', ()=>toast('已更新星级（示意）'));
+document.querySelectorAll('.chip,.stag').forEach(c=>c.addEventListener('click',()=>{
+  document.querySelectorAll('.'+c.className.split(' ')[0]).forEach(x=>x.classList.remove('on'));
+  c.classList.add('on');
+}));
+// 初始：手机模式，折叠面板收起
+setMode('mobile');
+</script>
+</body>
+</html>

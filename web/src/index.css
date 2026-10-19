@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body {
+  background-color: #F4F2EC;
+  color: #2B2B26;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+/* 步骤时间轴竖线 */
+.steps-rail { position: relative; }
+.steps-rail::before {
+  content: "";
+  position: absolute;
+  left: 18px; top: 14px; bottom: 14px;
+  width: 2px;
+  background: #EEF0E8;
+}
+
+/* 横向滚动条隐藏 */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* 星级 */
+.stars { letter-spacing: 1px; color: #E3DDC9; }
+.stars .on { color: #C9A24B; }
+
+/* 生成中 spinner */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2.5px solid #D9DDCF;
+  border-top-color: #5F7050;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 桌面端详情页双栏网格（>=768px） */
+@media (min-width: 768px) {
+  .detail-cols {
+    display: grid;
+    grid-template-columns: 370px 1fr;
+    gap: 20px;
+    grid-template-areas:
+      "hero rating"
+      "ing steps"
+      "season steps"
+      "notes steps"
+      "foot foot";
+  }
+  .a-hero { grid-area: hero; }
+  .a-ing { grid-area: ing; }
+  .a-season { grid-area: season; }
+  .a-notes { grid-area: notes; }
+  .a-rating { grid-area: rating; }
+  .a-steps { grid-area: steps; }
+  .a-foot { grid-area: foot; }
+}
