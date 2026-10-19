@@ -46,6 +46,14 @@ LLM_MODEL=kimi-k2-0905-preview
 - 菜谱库：`src/data/recipes.db`（SQLite；若 better-sqlite3 不可用自动回退 `src/data/recipes.json`）
 - 封面素材：`covers/`，建议偶尔备份 `src/data/` 和 `covers/`
 
+## 安卓 APP
+
+手机浏览器打开 `http://<电脑IP>:3456/EveryBite.apk` 下载安装包（需在手机上允许「安装未知来源应用」）。
+
+首次打开 APP 时输入/确认服务器地址（默认预填 `http://192.168.5.88:3456`，以电脑启动时打印的「手机访问」地址为准）；之后启动自动加载。连不上时会显示错误页，可「重试」或「修改地址」；使用中**长按返回键**可随时修改服务器地址。
+
+重新编译 APK：装好 Android SDK 后在 `android/` 下执行 `gradlew assembleDebug`（或便携 gradle），产物在 `android/app/build/outputs/apk/debug/`，复制为项目根目录的 `EveryBite.apk` 即可被服务托管。
+
 ## 开发
 
 ```bash

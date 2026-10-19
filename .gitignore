@@ -5,3 +5,10 @@ src/data/
 covers/
 .env
 *.log
+
+# 安卓构建产物与本地配置
+EveryBite.apk
+android/local.properties
+android/.gradle/
+android/build/
+android/app/build/

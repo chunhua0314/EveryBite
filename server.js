@@ -179,6 +179,17 @@ app.post('/api/recipes/:id/cover', (req, res) => {
 
 // ---------- 静态资源 ----------
 app.use('/covers', express.static(COVERS_DIR));
+// 安卓安装包：项目根目录存在 EveryBite.apk 时提供下载
+app.get('/EveryBite.apk', (req, res) => {
+  const apk = path.join(__dirname, 'EveryBite.apk');
+  if (fs.existsSync(apk)) {
+    res.setHeader('Content-Type', 'application/vnd.android.package-archive');
+    res.setHeader('Content-Disposition', 'attachment; filename="EveryBite.apk"');
+    res.sendFile(apk);
+  } else {
+    res.status(404).send('尚未构建安装包，请先在电脑上编译 android/ 工程');
+  }
+});
 const distDir = path.join(__dirname, 'web', 'dist');
 app.use(express.static(distDir));
 app.get(/^(?!\/api\/|\/covers\/).*/, (req, res) => {
