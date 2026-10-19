@@ -46,7 +46,7 @@ app.use(express.json({ limit: '2mb' }));
 // ---------- API ----------
 app.post('/api/parse', async (req, res) => {
   try {
-    const { url, title, text } = req.body || {};
+    const { url, title, text, referenceText } = req.body || {};
     let noteTitle = title || '';
     let noteText = text || '';
     let cover = '';
@@ -63,11 +63,15 @@ app.post('/api/parse', async (req, res) => {
       noteTags = note.tags || [];
       const asset = await saveCoverToAssets(cover);
       if (asset) coverLocal = asset.path;
-    } else if (!noteText.trim()) {
+    } else if (!noteText.trim() && !(referenceText && String(referenceText).trim())) {
       return res.status(400).json({ error: '请提供 url 或 {title, text}' });
     }
 
-    const { recipe, via } = await organizeRecipe({ title: noteTitle, text: noteText });
+    const { recipe, via, insufficient, reason } = await organizeRecipe({
+      title: noteTitle,
+      text: noteText,
+      referenceText: referenceText ? String(referenceText) : '',
+    });
     if (noteTags.length) {
       recipe.tags = [...new Set([...recipe.tags, ...noteTags])].slice(0, 8);
     }
@@ -89,6 +93,8 @@ app.post('/api/parse', async (req, res) => {
       tags: recipe.tags,
       raw_text: noteText,
       via,
+      insufficient: !!insufficient,
+      reason: reason || '',
     });
   } catch (e) {
     console.error('[parse]', e.message);

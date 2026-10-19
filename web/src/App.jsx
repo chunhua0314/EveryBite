@@ -13,6 +13,7 @@ export default function App() {
   const [selectedTags, setSelectedTags] = useState([]);
   const [q, setQ] = useState('');
   const [preview, setPreview] = useState(null);
+  const [addDraft, setAddDraft] = useState({ tab: 'link', url: '', title: '', text: '', referenceText: '' });
   const [toastMsg, setToastMsg] = useState('');
   const mainRef = useRef(null);
   const toastTimer = useRef(null);
@@ -104,6 +105,8 @@ export default function App() {
           )}
           {view.name === 'add' && (
             <Add
+              draft={addDraft}
+              setDraft={setAddDraft}
               onParsed={p => { setPreview(p); go('preview'); }}
               onError={onError}
             />
@@ -112,6 +115,7 @@ export default function App() {
             <Preview
               preview={preview}
               setPreview={setPreview}
+              referenceText={addDraft.referenceText}
               onBack={() => go('add')}
               onSaved={() => { refresh(); go('home'); }}
               onError={onError}

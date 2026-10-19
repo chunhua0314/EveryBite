@@ -44,13 +44,37 @@ function normalizeRecipeJson(obj, fallbackTitle) {
     steps,
     notes: String(obj.notes || '').trim(),
     tags: (Array.isArray(obj.tags) ? obj.tags : []).map(t => String(t).trim()).filter(Boolean).slice(0, 8),
+    insufficient: !!obj.insufficient,
+    reason: String(obj.reason || '').trim(),
   };
 }
 
-function buildPrompt(title, text) {
-  return `你是一名中餐菜谱整理助手。下面是一段小红书笔记的标题和正文，请把它整理成结构化菜谱。
+function buildPrompt(title, noteText, referenceText) {
+  const materials = referenceText
+    ? `【材料一：笔记正文】
+标题：${title || '（无）'}
+正文：
+${noteText || '（无）'}
 
-要求：
+【材料二：用户提供的参考文字（小红书AI总结的做法，可信度较高）】
+${referenceText}
+
+请综合两份材料整理；内容冲突时以更详细具体的为准。忠实性约束对两份材料同样适用。`
+    : `【笔记正文】
+标题：${title || '（无）'}
+正文：
+${noteText || '（无）'}`;
+
+  return `你是一名中餐菜谱整理助手。请把下面给出的材料整理成结构化菜谱。
+
+【忠实性约束（最重要，必须遵守）】
+- 严格基于所给材料整理，材料中没有的信息一律留空（空字符串或空数组）。
+- 严禁推测、编造、补充"常见做法""通常步骤"或任何材料之外的食材、调料、用量、火候、时间。
+- steps 的 heat/time 只有材料明确提到才填写，否则留空字符串。
+- 若材料信息不足以构成菜谱（既没有可提取的步骤，也没有可提取的食材），不要硬凑，改为输出：
+  {"insufficient": true, "reason": "一句话说明原因，如：正文仅为视频口播预告，未包含具体做法"}
+
+【输出要求】
 1. 只输出一个 JSON 对象，不要输出任何其他文字、不要用 markdown 代码块。
 2. JSON 结构：
 {
@@ -69,15 +93,11 @@ function buildPrompt(title, text) {
 }
 3. 食材和调料分开：油盐酱醋、葱姜蒜、香料算调料，其余算食材。
 4. 用量尽量保留原文写法（如"2勺""300g""适量"）。
-5. 如果正文里没有明确的步骤，根据正文描述合理归纳出步骤；实在无法归纳则 steps 为空数组。
 
-笔记标题：${title || '（无）'}
-
-笔记正文：
-${text || '（无）'}`;
+${materials}`;
 }
 
-async function callLLM(title, text) {
+async function callLLM(title, text, referenceText) {
   const key = process.env.LLM_API_KEY;
   const baseUrl = (process.env.LLM_BASE_URL || 'https://api.moonshot.cn/v1').replace(/\/+$/, '');
   const model = process.env.LLM_MODEL || 'kimi-k2-0905-preview';
@@ -98,7 +118,7 @@ async function callLLM(title, text) {
         temperature: 0.2,
         messages: [
           { role: 'system', content: '你是菜谱结构化助手，只输出严格 JSON。' },
-          { role: 'user', content: buildPrompt(title, text) },
+          { role: 'user', content: buildPrompt(title, text, referenceText) },
         ],
       }),
     });
@@ -236,6 +256,8 @@ function ruleFallback(title, text) {
   const taste = (allText.match(/咸甜|酸甜|香辣|麻辣|酸辣|清淡|咸鲜|鲜甜|咸香|微辣|甜辣/) || [''])[0];
   const main_ingredient = ingredients.length ? ingredients[0].name : '';
 
+  const insufficient = steps.length === 0 && ingredients.length === 0;
+
   return {
     title: (title || '').replace(/[🔥🌟✨⭐💥‼️❗️]/g, '').trim().slice(0, 40) || '未命名菜谱',
     subtitle: '',
@@ -244,20 +266,25 @@ function ruleFallback(title, text) {
     ingredients, seasonings, steps,
     notes: notesLines.join('\n'),
     tags: guessTags(title, text),
+    insufficient,
+    reason: insufficient ? '未能从文本中提取到做法信息' : '',
   };
 }
 
-async function organizeRecipe({ title, text }) {
-  // 优先 LLM，失败重试一次，再失败/无 Key 走规则兜底
+async function organizeRecipe({ title, text, referenceText }) {
+  // 优先 LLM；LLM 明确判定信息不足时直接返回（不重试、不走规则兜底，避免拼出误导内容）
   if (process.env.LLM_API_KEY) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const content = await callLLM(title, text);
+        const content = await callLLM(title, text, referenceText);
         const obj = extractJson(content);
         if (obj) {
           const recipe = normalizeRecipeJson(obj, title);
+          if (recipe.insufficient) {
+            return { recipe, via: attempt === 0 ? 'llm' : 'llm-retry', insufficient: true, reason: recipe.reason };
+          }
           if (recipe.title && (recipe.steps.length || recipe.ingredients.length)) {
-            return { recipe, via: attempt === 0 ? 'llm' : 'llm-retry' };
+            return { recipe, via: attempt === 0 ? 'llm' : 'llm-retry', insufficient: false };
           }
         }
         console.warn(`[ai] LLM 输出校验失败（第 ${attempt + 1} 次）`);
@@ -269,7 +296,10 @@ async function organizeRecipe({ title, text }) {
   } else {
     console.log('[ai] 未配置 LLM_API_KEY，使用规则兜底解析');
   }
-  return { recipe: ruleFallback(title, text), via: 'rule' };
+  // 规则兜底：合并正文与参考文字一起解析
+  const combined = [text, referenceText].filter(s => s && String(s).trim()).join('\n');
+  const recipe = ruleFallback(title, combined);
+  return { recipe, via: 'rule', insufficient: recipe.insufficient, reason: recipe.reason };
 }
 
 module.exports = { organizeRecipe, ruleFallback };

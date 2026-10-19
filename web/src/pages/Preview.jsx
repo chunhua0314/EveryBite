@@ -2,18 +2,18 @@ import React, { useState } from 'react';
 import { api } from '../api.js';
 import { TagEditor, Cover } from '../components.jsx';
 
-export default function Preview({ preview, setPreview, onSaved, onBack, onError, toast }) {
+export default function Preview({ preview, setPreview, referenceText, onSaved, onBack, onError, toast }) {
   const [busy, setBusy] = useState(false);
   const [reparsing, setReparsing] = useState(false);
   const p = preview;
   const patch = (obj) => setPreview({ ...p, ...obj });
 
   const save = async () => {
-    if (busy) return;
+    if (busy || p.insufficient) return;
     if (!p.title.trim()) return onError('菜名不能为空');
     setBusy(true);
     try {
-      const { via, ...body } = p;
+      const { via, insufficient, reason, ...body } = p;
       const saved = await api.createRecipe(body);
       toast('已保存到菜谱库 🎉');
       onSaved(saved);
@@ -29,6 +29,7 @@ export default function Preview({ preview, setPreview, onSaved, onBack, onError,
     setReparsing(true);
     try {
       const body = p.source_url ? { url: p.source_url } : { title: p.title, text: p.raw_text };
+      if (referenceText && referenceText.trim()) body.referenceText = referenceText;
       const fresh = await api.parse(body);
       setPreview({ ...fresh, title: p.title, tags: p.tags });
       toast('已重新整理');
@@ -46,14 +47,31 @@ export default function Preview({ preview, setPreview, onSaved, onBack, onError,
     p.main_ingredient && `🍗 ${p.main_ingredient}`,
   ].filter(Boolean).join(' · ');
 
+  const viaBadge = p.insufficient
+    ? { text: '⚠️ 信息不足', cls: 'bg-tweak-bg text-[#8a6d1a]' }
+    : p.via === 'rule'
+      ? { text: '规则整理', cls: 'bg-bg text-muted' }
+      : { text: 'AI 整理', cls: 'bg-olive-soft text-olive' };
+
   return (
     <section>
       <div className="flex items-center justify-between px-0.5 pt-5 pb-3.5">
         <button className="bg-card rounded-full px-3.5 py-2 text-[13px] text-ink2 shadow-soft" onClick={onBack}>‹ 返回</button>
-        <span className="text-xs text-muted">已生成{p.via === 'rule' ? '（规则整理）' : ''}，请确认</span>
+        <span className={`text-xs rounded-full px-2.5 py-1 ${viaBadge.cls}`}>{viaBadge.text}</span>
       </div>
 
       <div className="md:max-w-[640px] md:mx-auto">
+        {p.insufficient && (
+          <div className="mb-3.5 bg-tweak-bg border-l-[3px] border-tweak-bar rounded-r-xl p-3.5">
+            <div className="text-[13px] text-[#8a6d1a] leading-relaxed font-semibold mb-1">
+              ⚠️ 笔记正文信息不足，AI 没有编造做法。
+            </div>
+            {p.reason && <div className="text-[12px] text-[#8a6d1a]/80 mb-2">{p.reason}</div>}
+            <div className="text-[12px] text-[#8a6d1a]/80 leading-relaxed">
+              请返回上一页，把小红书「AI 点点」总结的步骤文字粘贴到「参考文字」后重新整理。
+            </div>
+          </div>
+        )}
         <div className="bg-card rounded-card shadow-soft p-6 mb-3.5 relative overflow-hidden">
           <div className="font-serif text-[44px] font-extrabold text-olive-line leading-none">★</div>
           <input
@@ -106,8 +124,9 @@ export default function Preview({ preview, setPreview, onSaved, onBack, onError,
           <button
             className="flex-[2] bg-olive text-white text-[15px] font-semibold py-3.5 rounded-full shadow-[0_6px_16px_rgba(95,112,80,.28)] disabled:opacity-50"
             onClick={save}
-            disabled={busy}
-          >{busy ? '保存中…' : '保存到菜谱库'}</button>
+            disabled={busy || p.insufficient}
+            title={p.insufficient ? '信息不足，无法保存' : ''}
+          >{p.insufficient ? '信息不足，无法保存' : busy ? '保存中…' : '保存到菜谱库'}</button>
         </div>
       </div>
     </section>
