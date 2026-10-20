@@ -3,26 +3,33 @@ package com.everybite.app;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
     private static final String PREFS = "everybite";
     private static final String KEY_SERVER = "server_url";
     private static final String DEFAULT_SERVER = "http://192.168.5.88:3456";
+    private static final int REQ_FILE_CHOOSER = 1001;
 
     private WebView webView;
     private SharedPreferences prefs;
+    private ValueCallback<Uri[]> filePathCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,6 +56,30 @@ public class MainActivity extends Activity {
                 return false;
             }
         });
+        // WebView 默认不处理 <input type="file">，需要原生层调起系统相册
+        webView.setWebChromeClient(new WebChromeClient() {
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
+                                             FileChooserParams params) {
+                if (filePathCallback != null) filePathCallback.onReceiveValue(null);
+                filePathCallback = callback;
+
+                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                String[] accept = params != null ? params.getAcceptTypes() : null;
+                intent.setType(accept != null && accept.length > 0 && !accept[0].isEmpty()
+                        ? accept[0] : "image/*");
+                try {
+                    startActivityForResult(
+                            Intent.createChooser(intent, "选择封面照片"), REQ_FILE_CHOOSER);
+                } catch (Exception e) {
+                    filePathCallback = null;
+                    Toast.makeText(MainActivity.this, "无法打开相册", Toast.LENGTH_SHORT).show();
+                    return false;
+                }
+                return true;
+            }
+        });
         setContentView(webView);
 
         String server = prefs.getString(KEY_SERVER, null);
@@ -56,6 +87,20 @@ public class MainActivity extends Activity {
             showServerDialog(); // 首次启动先确认服务器地址
         } else {
             loadApp();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_FILE_CHOOSER && filePathCallback != null) {
+            Uri[] results = null;
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                results = new Uri[]{ data.getData() }; // 单选即可，前端是单文件上传
+            }
+            // 取消或失败也必须回传 null，否则后续文件选择会卡死
+            filePathCallback.onReceiveValue(results);
+            filePathCallback = null;
         }
     }
 
