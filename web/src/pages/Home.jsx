@@ -212,7 +212,8 @@ export default function Home({ recipes, allTags, categories = [], selectedCatego
               onClick={() => importRef.current && importRef.current.click()}
               disabled={importing}
             >{importing ? '导入中…' : '📥 导入备份'}</button>
-            <input ref={importRef} type="file" accept=".zip" className="hidden" onChange={onImportFile} />
+            {/* 不加 accept：部分安卓 ROM 未注册 zip mime 会报"没有应用可执行的操作"；服务端会校验 zip 有效性 */}
+            <input ref={importRef} type="file" className="hidden" onChange={onImportFile} />
             {importing && (
               <div className="flex items-center gap-2 text-[12px] text-ink2 py-1 justify-center">
                 <span className="spinner"></span><span>正在导入，请勿关闭…</span>

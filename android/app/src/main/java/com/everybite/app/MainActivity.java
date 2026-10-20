@@ -72,13 +72,24 @@ public class MainActivity extends Activity {
                 String[] accept = params != null ? params.getAcceptTypes() : null;
                 intent.setType(accept != null && accept.length > 0 && !accept[0].isEmpty()
                         ? accept[0] : "image/*");
+                // 部分 ROM 的文件管理器没注册对应 mime，找不到 handler 时降级 */*
+                if (intent.resolveActivity(getPackageManager()) == null) {
+                    intent.setType("*/*");
+                }
                 try {
                     startActivityForResult(
                             Intent.createChooser(intent, "选择封面照片"), REQ_FILE_CHOOSER);
                 } catch (Exception e) {
-                    filePathCallback = null;
-                    Toast.makeText(MainActivity.this, "无法打开相册", Toast.LENGTH_SHORT).show();
-                    return false;
+                    // chooser 也失败时最后尝试 */* 直接调起
+                    try {
+                        intent.setType("*/*");
+                        startActivityForResult(intent, REQ_FILE_CHOOSER);
+                        return true;
+                    } catch (Exception e2) {
+                        filePathCallback = null;
+                        Toast.makeText(MainActivity.this, "无法打开相册", Toast.LENGTH_SHORT).show();
+                        return false;
+                    }
                 }
                 return true;
             }
