@@ -166,6 +166,7 @@ export default function App() {
               onOpen={id => go('detail', id)}
               onChanged={refresh}
               onError={onError}
+              onToast={toast}
             />
           )}
           {view.name === 'add' && (

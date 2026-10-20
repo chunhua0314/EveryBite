@@ -9,12 +9,37 @@ const SORT_OPTIONS = [
 ];
 
 export default function Home({ recipes, allTags, categories = [], selectedCategory, onSelectCategory,
-  selectedTags, onToggleTag, q, setQ, sort, setSort, onOpen, onChanged, onError }) {
+  selectedTags, onToggleTag, q, setQ, sort, setSort, onOpen, onChanged, onError, onToast }) {
 
   const [renaming, setRenaming] = useState(null); // recipe 对象
   const [renameText, setRenameText] = useState('');
+  const [showData, setShowData] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef(null);
   const lpTimer = useRef(null);
   const lpFired = useRef(false);
+
+  const onImportFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!window.confirm('导入将覆盖当前全部数据（当前数据会自动备份到电脑 backups/ 目录），确定继续？')) return;
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/api/backup/import', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `导入失败（HTTP ${res.status}）`);
+      setShowData(false);
+      onChanged();
+      if (onToast) onToast(`已导入 ${data.recipes} 条菜谱`);
+    } catch (err) {
+      if (onError) onError(err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
 
   const startRename = (r) => { setRenaming(r); setRenameText(r.title); };
   const submitRename = async () => {
@@ -46,7 +71,14 @@ export default function Home({ recipes, allTags, categories = [], selectedCatego
     <section>
       <div className="flex items-baseline justify-between px-0.5 pt-5 pb-3.5">
         <h2 className="font-serif text-2xl font-extrabold text-ink">我的菜谱</h2>
-        <span className="text-xs text-muted">共 {recipes.length} 道</span>
+        <span className="flex items-center gap-2">
+          <span className="text-xs text-muted">共 {recipes.length} 道</span>
+          <button
+            className="w-8 h-8 rounded-full bg-card shadow-soft text-[14px] text-ink2 flex items-center justify-center"
+            title="数据管理"
+            onClick={() => setShowData(true)}
+          >⚙️</button>
+        </span>
       </div>
 
       <div className="flex items-center gap-2 mb-3">
@@ -151,6 +183,51 @@ export default function Home({ recipes, allTags, categories = [], selectedCatego
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 数据管理弹窗 */}
+      {showData && (
+        <div
+          className="fixed inset-0 z-50 bg-ink/40 flex items-center justify-center p-6"
+          onClick={() => !importing && setShowData(false)}
+        >
+          <div
+            className="bg-card rounded-card shadow-lift p-5 w-full max-w-[340px]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="font-serif text-[17px] font-extrabold text-ink mb-4">数据管理</div>
+
+            <a
+              href="/api/backup/export"
+              download
+              className="block w-full text-center bg-olive text-white text-sm font-semibold py-3 rounded-full mb-2"
+            >📦 导出备份</a>
+            <p className="text-[11.5px] text-muted leading-relaxed mb-4 px-0.5">
+              数据库 + 封面打包下载，约几 MB。换电脑部署时用这个文件恢复。
+            </p>
+
+            <button
+              className="w-full bg-bg text-ink2 text-sm font-semibold py-3 rounded-full mb-2 disabled:opacity-50"
+              onClick={() => importRef.current && importRef.current.click()}
+              disabled={importing}
+            >{importing ? '导入中…' : '📥 导入备份'}</button>
+            <input ref={importRef} type="file" accept=".zip" className="hidden" onChange={onImportFile} />
+            {importing && (
+              <div className="flex items-center gap-2 text-[12px] text-ink2 py-1 justify-center">
+                <span className="spinner"></span><span>正在导入，请勿关闭…</span>
+              </div>
+            )}
+            <p className="text-[11.5px] text-muted leading-relaxed px-0.5">
+              导入会覆盖当前全部数据，当前数据会自动备份到电脑 backups/ 目录。
+            </p>
+
+            <button
+              className="w-full text-muted text-[13px] mt-4"
+              onClick={() => setShowData(false)}
+              disabled={importing}
+            >关闭</button>
+          </div>
         </div>
       )}
 

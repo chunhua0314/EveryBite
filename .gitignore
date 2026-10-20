@@ -12,3 +12,6 @@ android/local.properties
 android/.gradle/
 android/build/
 android/app/build/
+
+# 导入备份前的自动快照
+backups/

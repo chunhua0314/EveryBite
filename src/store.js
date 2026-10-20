@@ -101,6 +101,13 @@ function createSqliteStore() {
 
   return {
     kind: 'sqlite',
+    // 在线快照到指定文件（服务运行中导出一致）
+    backupTo(dest) {
+      return db.backup(dest);
+    },
+    close() {
+      db.close();
+    },
     list({ tag, q, category, sort } = {}) {
       let sql = 'SELECT DISTINCT r.* FROM recipes r';
       const params = [];
@@ -199,6 +206,12 @@ function createJsonStore() {
 
   return {
     kind: 'json',
+    backupTo(dest) {
+      save(); // 先落盘再复制
+      fs.copyFileSync(file, dest);
+      return Promise.resolve();
+    },
+    close() {},
     list({ tag, q, category, sort } = {}) {
       const tags = tag ? (Array.isArray(tag) ? tag : String(tag).split(',')).filter(Boolean) : [];
       let rows = state.recipes.slice();
@@ -295,13 +308,27 @@ function createJsonStore() {
   };
 }
 
-let store;
-try {
-  store = createSqliteStore();
-  console.log('[store] 使用 SQLite (recipes.db)');
-} catch (e) {
-  console.warn('[store] better-sqlite3 不可用，回退 JSON 文件存储 (recipes.json):', e.message);
-  store = createJsonStore();
+function init() {
+  try {
+    const s = createSqliteStore();
+    console.log('[store] 使用 SQLite (recipes.db)');
+    return s;
+  } catch (e) {
+    console.warn('[store] better-sqlite3 不可用，回退 JSON 文件存储 (recipes.json):', e.message);
+    return createJsonStore();
+  }
 }
 
-module.exports = store;
+let impl = init();
+
+// 转发到当前实现；reinit() 关闭旧连接后重新初始化（导入备份后调用）
+const handler = {
+  reinit() {
+    if (impl && typeof impl.close === 'function') impl.close();
+    impl = init();
+  },
+};
+
+module.exports = new Proxy(handler, {
+  get: (target, prop) => (prop in target ? target[prop] : impl[prop]),
+});

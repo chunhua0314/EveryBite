@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const express = require('express');
 const multer = require('multer');
+const AdmZip = require('adm-zip');
 const store = require('./src/store');
 const { scrapeNote } = require('./src/scrape');
 const { organizeRecipe } = require('./src/ai');
@@ -155,6 +156,118 @@ app.get('/api/tags', (req, res) => {
 
 app.get('/api/categories', (req, res) => {
   res.json(store.listCategories());
+});
+
+// ---------- 数据备份与恢复 ----------
+const DATA_DIR = path.join(__dirname, 'src', 'data');
+const BACKUPS_DIR = path.join(__dirname, 'backups');
+
+function timestampName() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+app.get('/api/backup/export', async (req, res) => {
+  const tmpSnapshot = path.join(os.tmpdir(), `everybite-snapshot-${Date.now()}.db`);
+  try {
+    const zip = new AdmZip();
+    if (store.kind === 'sqlite') {
+      await store.backupTo(tmpSnapshot); // SQLite 在线快照
+      zip.addLocalFile(tmpSnapshot, 'src/data', 'recipes.db');
+    } else {
+      zip.addLocalFile(path.join(DATA_DIR, 'recipes.json'), 'src/data', 'recipes.json');
+    }
+    if (fs.existsSync(COVERS_DIR)) zip.addLocalFolder(COVERS_DIR, 'covers');
+    const fname = `EveryBite-backup-${timestampName()}.zip`;
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+    res.send(zip.toBuffer());
+  } catch (e) {
+    console.error('[backup] 导出失败:', e.message);
+    res.status(500).json({ error: `导出失败：${e.message}` });
+  } finally {
+    fs.unlink(tmpSnapshot, () => {});
+  }
+});
+
+const importUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, fs.mkdtempSync(path.join(os.tmpdir(), 'eb-import-'))),
+    filename: (req, file, cb) => cb(null, 'backup.zip'),
+  }),
+  limits: { fileSize: 200 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/\.zip$/i.test(file.originalname) || /zip/i.test(file.mimetype)) cb(null, true);
+    else cb(new Error('只支持 zip 备份文件'));
+  },
+});
+
+app.post('/api/backup/import', (req, res) => {
+  importUpload.single('file')(req, res, async (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? '备份文件不能超过 200MB' : (err.message || '上传失败');
+      return res.status(400).json({ error: msg });
+    }
+    if (!req.file) return res.status(400).json({ error: '没有收到备份文件' });
+    const zipPath = req.file.path;
+    const extractDir = fs.mkdtempSync(path.join(os.tmpdir(), 'eb-extract-'));
+    const cleanup = () => {
+      fs.rm(extractDir, { recursive: true, force: true }, () => {});
+      fs.rm(path.dirname(zipPath), { recursive: true, force: true }, () => {});
+    };
+    try {
+      // 1. 解压并校验（校验不过不改动任何现有数据）
+      try {
+        new AdmZip(zipPath).extractAllTo(extractDir, true);
+      } catch (ze) {
+        cleanup();
+        return res.status(400).json({ error: '备份文件无效：不是可识别的 zip 文件，未改动任何数据' });
+      }
+      const dataSrc = path.join(extractDir, 'src', 'data');
+      const hasDb = fs.existsSync(path.join(dataSrc, 'recipes.db'));
+      const hasJson = fs.existsSync(path.join(dataSrc, 'recipes.json'));
+      if (!hasDb && !hasJson) {
+        cleanup();
+        return res.status(400).json({ error: '备份文件无效：缺少 src/data/recipes.db（或 recipes.json），未改动任何数据' });
+      }
+      const coversSrc = path.join(extractDir, 'covers');
+      const hasCovers = fs.existsSync(coversSrc);
+
+      // 2. 导入前完整备份当前数据
+      const stamp = `before-import-${Date.now()}`;
+      const snapshotDir = path.join(BACKUPS_DIR, stamp);
+      fs.mkdirSync(snapshotDir, { recursive: true });
+      if (fs.existsSync(DATA_DIR)) fs.cpSync(DATA_DIR, path.join(snapshotDir, 'data'), { recursive: true });
+      if (fs.existsSync(COVERS_DIR)) fs.cpSync(COVERS_DIR, path.join(snapshotDir, 'covers'), { recursive: true });
+
+      // 3. 关闭旧连接 → 清旧放新 → 重新初始化
+      if (typeof store.close === 'function') store.close();
+      for (const f of ['recipes.db', 'recipes.db-wal', 'recipes.db-shm', 'recipes.json']) {
+        fs.rmSync(path.join(DATA_DIR, f), { force: true });
+      }
+      fs.rmSync(COVERS_DIR, { recursive: true, force: true });
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      fs.mkdirSync(COVERS_DIR, { recursive: true });
+      fs.cpSync(dataSrc, DATA_DIR, { recursive: true });
+      if (hasCovers) fs.cpSync(coversSrc, COVERS_DIR, { recursive: true });
+      // WAL 残留防御性清理
+      for (const f of ['recipes.db-wal', 'recipes.db-shm']) {
+        fs.rmSync(path.join(DATA_DIR, f), { force: true });
+      }
+      store.reinit();
+
+      const recipes = store.list({});
+      const assets = store.listAssets();
+      cleanup();
+      res.json({ ok: true, recipes: recipes.length, assets: assets.length });
+    } catch (e) {
+      console.error('[backup] 导入失败:', e.message);
+      cleanup();
+      try { store.reinit(); } catch { /* 尽力恢复 */ }
+      res.status(500).json({ error: `导入失败：${e.message}` });
+    }
+  });
 });
 
 // ---------- 素材库 ----------
