@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
-import { Stars, TagEditor, Cover, Accordion, ListTable } from '../components.jsx';
+import { Stars, TagEditor, Cover, Accordion, ListTable, BackFab } from '../components.jsx';
 
 function TweakEditor({ initial, onSave, onCancel }) {
   const [text, setText] = useState(initial || '');
@@ -26,6 +26,8 @@ function TweakEditor({ initial, onSave, onCancel }) {
 
 function CoverPicker({ recipe, onPatched, onClose, onError }) {
   const [assets, setAssets] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
   useEffect(() => {
     api.listAssets('cover').then(setAssets).catch(e => onError(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -42,15 +44,39 @@ function CoverPicker({ recipe, onPatched, onClose, onError }) {
       await api.setCover(recipe.id, { generate: true });
     } catch (e) { onError(e.message); }
   };
+  const onFile = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const updated = await api.uploadCover(recipe.id, file);
+      onPatched(updated);
+      onClose();
+    } catch (err) {
+      onError(err.message);
+    } finally {
+      setUploading(false);
+    }
+  };
   return (
     <div className="mt-2 border-t border-line pt-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-[12px] text-muted">从素材库选择封面</span>
         <div className="flex gap-3">
+          <button className="text-[12px] text-olive" onClick={() => fileRef.current && fileRef.current.click()} disabled={uploading}>
+            {uploading ? '上传中…' : '📷 从相册上传'}
+          </button>
           <button className="text-[12px] text-olive" onClick={generate}>✨ AI 生图</button>
           <button className="text-[12px] text-muted" onClick={onClose}>收起</button>
         </div>
       </div>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
+      {uploading && (
+        <div className="flex items-center gap-2 text-[12px] text-ink2 py-1">
+          <span className="spinner"></span><span>正在上传封面…</span>
+        </div>
+      )}
       {assets === null ? (
         <div className="text-[12px] text-muted py-2">加载中…</div>
       ) : assets.length === 0 ? (
@@ -80,6 +106,8 @@ export default function Detail({ id, onBack, onDeleted, onError, toast }) {
   const [showCoverPicker, setShowCoverPicker] = useState(false);
   const [editingCategory, setEditingCategory] = useState(false);
   const [categoryText, setCategoryText] = useState('');
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleText, setTitleText] = useState('');
 
   useEffect(() => {
     api.getRecipe(id).then(r => {
@@ -140,8 +168,8 @@ export default function Detail({ id, onBack, onDeleted, onError, toast }) {
 
   return (
     <section>
-      <div className="flex items-center justify-between px-0.5 pt-5 pb-3.5">
-        <button className="bg-card rounded-full px-3.5 py-2 text-[13px] text-ink2 shadow-soft" onClick={onBack}>‹ 返回</button>
+      <BackFab onClick={onBack} />
+      <div className="flex items-center justify-end px-0.5 pt-5 pb-3.5">
         <span className="text-xs text-muted">{recipe.created_at ? `${String(recipe.created_at).slice(0, 10)} 收藏` : ''}</span>
       </div>
 
@@ -151,7 +179,29 @@ export default function Detail({ id, onBack, onDeleted, onError, toast }) {
           <div className="font-serif text-[44px] font-extrabold text-olive-line leading-none">
             {String(recipe.id).padStart(2, '0')}
           </div>
-          <h1 className="font-serif text-[30px] font-extrabold text-ink mt-1 mb-0.5">{recipe.title}</h1>
+          {editingTitle ? (
+            <input
+              autoFocus
+              value={titleText}
+              onChange={e => setTitleText(e.target.value)}
+              onBlur={() => {
+                setEditingTitle(false);
+                const v = titleText.trim();
+                if (v && v !== recipe.title) patch({ title: v }, true);
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.target.blur();
+                if (e.key === 'Escape') setEditingTitle(false);
+              }}
+              className="font-serif text-[30px] font-extrabold text-ink mt-1 mb-0.5 w-full bg-transparent outline-none border-b border-olive-line focus:border-olive"
+            />
+          ) : (
+            <h1
+              className="font-serif text-[30px] font-extrabold text-ink mt-1 mb-0.5 cursor-text"
+              title="点击修改菜名"
+              onClick={() => { setTitleText(recipe.title); setEditingTitle(true); }}
+            >{recipe.title}</h1>
+          )}
           <div className="text-[11px] text-muted tracking-[2.5px] mb-3">{recipe.subtitle || ''}</div>
           {recipe.summary && <p className="text-[13px] text-ink2 leading-[1.9] mb-3.5">{recipe.summary}</p>}
           <div className="flex gap-1.5 flex-wrap items-center">

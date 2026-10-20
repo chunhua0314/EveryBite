@@ -99,8 +99,14 @@ export default function Add({ draft, setDraft, onParsed, onError }) {
                 onChange={e => patch({ referenceText: e.target.value })}
                 placeholder="参考文字（可选）：如果笔记是视频、正文没写做法，可把小红书 AI 点点总结的步骤粘贴到这里，AI 会一并参考"
               />
-              <p className="text-xs text-muted leading-relaxed mt-2.5 mb-4 px-0.5">
-                视频类笔记正文常常没有做法，AI 不会凭空编造；补上参考文字后再生成效果更好。
+              <p className="text-xs text-muted leading-relaxed mt-2.5 mb-4 px-0.5 flex items-center justify-between">
+                <span>视频类笔记正文常常没有做法，AI 不会凭空编造；补上参考文字后再生成效果更好。</span>
+                {(url || referenceText) && (
+                  <button
+                    className="shrink-0 ml-2 text-muted hover:text-olive underline underline-offset-2"
+                    onClick={() => patch({ url: '', referenceText: '' })}
+                  >清空</button>
+                )}
               </p>
             </div>
           ) : (

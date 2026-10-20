@@ -101,7 +101,7 @@ function createSqliteStore() {
 
   return {
     kind: 'sqlite',
-    list({ tag, q, category } = {}) {
+    list({ tag, q, category, sort } = {}) {
       let sql = 'SELECT DISTINCT r.* FROM recipes r';
       const params = [];
       const tags = tag ? (Array.isArray(tag) ? tag : String(tag).split(',')).filter(Boolean) : [];
@@ -120,7 +120,13 @@ function createSqliteStore() {
         params.push(like, like, like);
       }
       if (conds.length) sql += ` WHERE ${conds.join(' AND ')}`;
-      sql += ' ORDER BY r.updated_at DESC';
+      if (sort === 'rating') {
+        sql += ' ORDER BY CASE WHEN r.rating=0 THEN 1 ELSE 0 END, r.rating DESC, r.updated_at DESC';
+      } else if (sort === 'created') {
+        sql += ' ORDER BY r.created_at DESC';
+      } else {
+        sql += ' ORDER BY r.updated_at DESC';
+      }
       return db.prepare(sql).all(...params).map(r => normalizeRecipe(r, getTagNames(r.id)));
     },
     get(id) {
@@ -193,7 +199,7 @@ function createJsonStore() {
 
   return {
     kind: 'json',
-    list({ tag, q, category } = {}) {
+    list({ tag, q, category, sort } = {}) {
       const tags = tag ? (Array.isArray(tag) ? tag : String(tag).split(',')).filter(Boolean) : [];
       let rows = state.recipes.slice();
       if (category) rows = rows.filter(r => r.category === String(category));
@@ -204,6 +210,17 @@ function createJsonStore() {
           (r.title || '').toLowerCase().includes(s) ||
           JSON.stringify(r.ingredients || []).toLowerCase().includes(s) ||
           JSON.stringify(r.seasonings || []).toLowerCase().includes(s));
+      }
+      if (sort === 'rating') {
+        return rows.sort((a, b) => {
+          const ra = a.rating || 0, rb = b.rating || 0;
+          if ((ra === 0) !== (rb === 0)) return ra === 0 ? 1 : -1;
+          if (rb !== ra) return rb - ra;
+          return String(b.updated_at).localeCompare(String(a.updated_at));
+        });
+      }
+      if (sort === 'created') {
+        return rows.sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
       }
       return rows.sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
     },

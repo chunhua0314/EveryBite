@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const express = require('express');
+const multer = require('multer');
 const store = require('./src/store');
 const { scrapeNote } = require('./src/scrape');
 const { organizeRecipe } = require('./src/ai');
@@ -110,8 +111,8 @@ app.post('/api/parse', async (req, res) => {
 });
 
 app.get('/api/recipes', (req, res) => {
-  const { tag, q, category } = req.query;
-  res.json(store.list({ tag, q, category }));
+  const { tag, q, category, sort } = req.query;
+  res.json(store.list({ tag, q, category, sort }));
 });
 
 app.get('/api/recipes/:id', (req, res) => {
@@ -161,9 +162,49 @@ app.get('/api/assets', (req, res) => {
   res.json(store.listAssets(req.query.category));
 });
 
+// 上传手机相册图片做封面
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: COVERS_DIR,
+    filename: (req, file, cb) => {
+      const ext = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' }[file.mimetype] || '.jpg';
+      cb(null, `upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (/^image\/(jpeg|png|webp|gif)$/.test(file.mimetype)) cb(null, true);
+    else cb(new Error('只支持 jpg/png/webp/gif 图片'));
+  },
+});
+
+app.post('/api/recipes/:id/cover-upload', (req, res) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? '图片不能超过 10MB' : (err.message || '上传失败');
+      return res.status(400).json({ error: msg });
+    }
+    const id = Number(req.params.id);
+    const recipe = store.get(id);
+    if (!recipe) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      return res.status(404).json({ error: '菜谱不存在' });
+    }
+    if (!req.file) return res.status(400).json({ error: '没有收到图片文件' });
+    const asset = store.createAsset({
+      path: `covers/${req.file.filename}`,
+      category: recipe.main_ingredient || 'upload',
+      source: 'manual',
+      recipe_id: id,
+    });
+    store.touchAsset(asset.id);
+    const updated = store.update(id, { cover_local: asset.path });
+    res.json(updated);
+  });
+});
+
 // 换封面：{assetId} 用素材库图片；{generate:true} AI 生图（占位，未实现）
-app.post('/api/recipes/:id/cover', (req, res) => {
-  const id = Number(req.params.id);
+app.post('/api/recipes/:id/cover', (req, res) => {  const id = Number(req.params.id);
   const recipe = store.get(id);
   if (!recipe) return res.status(404).json({ error: '菜谱不存在' });
   const { assetId, generate } = req.body || {};

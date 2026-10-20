@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { api } from '../api.js';
-import { TagEditor, Cover } from '../components.jsx';
+import { TagEditor, Cover, BackFab } from '../components.jsx';
 
 export default function Preview({ preview, setPreview, referenceText, onSaved, onBack, onError, toast }) {
   const [busy, setBusy] = useState(false);
@@ -55,8 +55,8 @@ export default function Preview({ preview, setPreview, referenceText, onSaved, o
 
   return (
     <section>
-      <div className="flex items-center justify-between px-0.5 pt-5 pb-3.5">
-        <button className="bg-card rounded-full px-3.5 py-2 text-[13px] text-ink2 shadow-soft" onClick={onBack}>‹ 返回</button>
+      <BackFab onClick={onBack} />
+      <div className="flex items-center justify-end px-0.5 pt-5 pb-3.5">
         <span className={`text-xs rounded-full px-2.5 py-1 ${viaBadge.cls}`}>{viaBadge.text}</span>
       </div>
 

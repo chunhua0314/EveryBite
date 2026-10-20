@@ -57,9 +57,11 @@ LLM_MODEL=kimi-k2-0905-preview
 ## 开发
 
 ```bash
-npm install            # 后端
+npm install            # 后端（express + better-sqlite3 + multer）
 cd web && npm install  # 前端
 npm start              # 后端（托管 web/dist）
 cd web && npm run build  # 前端构建
 node scripts/test-scrape.js  # 抓取自测
 ```
+
+后端依赖 multer 用于 `POST /api/recipes/:id/cover-upload`（详情页「换封面 → 从相册上传」，multipart 单文件，仅图片、≤10MB，存 `covers/` 并登记素材库）。

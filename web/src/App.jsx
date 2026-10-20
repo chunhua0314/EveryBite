@@ -13,12 +13,16 @@ export default function App() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedTags, setSelectedTags] = useState([]);
+  const [sort, setSort] = useState('updated');
   const [q, setQ] = useState('');
   const [preview, setPreview] = useState(null);
   const [addDraft, setAddDraft] = useState({ tab: 'link', url: '', title: '', text: '', referenceText: '' });
+  const [refreshing, setRefreshing] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const mainRef = useRef(null);
   const toastTimer = useRef(null);
+  const pullStartY = useRef(null);
+  const pulling = useRef(false);
 
   const toast = useCallback((msg) => {
     setToastMsg(msg);
@@ -30,7 +34,7 @@ export default function App() {
   const refresh = useCallback(async () => {
     try {
       const [list, tags, cats] = await Promise.all([
-        api.listRecipes({ q, tags: selectedTags, category: selectedCategory }),
+        api.listRecipes({ q, tags: selectedTags, category: selectedCategory, sort }),
         api.listTags(),
         api.listCategories(),
       ]);
@@ -40,16 +44,41 @@ export default function App() {
     } catch (e) {
       onError(e.message);
     }
-  }, [q, selectedTags, selectedCategory, onError]);
+  }, [q, selectedTags, selectedCategory, sort, onError]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  // 详情页返回后刷新列表（星级/标签可能变了）
+  // 下拉刷新（WebView 里可用）
+  const doRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refresh();
+    setRefreshing(false);
+  }, [refresh]);
+
+  const onMainTouchStart = (e) => {
+    if (mainRef.current && mainRef.current.scrollTop <= 0) {
+      pullStartY.current = e.touches[0].clientY;
+      pulling.current = false;
+    } else {
+      pullStartY.current = null;
+    }
+  };
+  const onMainTouchMove = (e) => {
+    if (pullStartY.current === null || pulling.current) return;
+    if (e.touches[0].clientY - pullStartY.current > 80 && mainRef.current.scrollTop <= 0) {
+      pulling.current = true;
+      pullStartY.current = null;
+      doRefresh();
+    }
+  };
+  const onMainTouchEnd = () => { pullStartY.current = null; };
+
+  // 详情页返回后刷新列表（星级/标签可能变了）；回到首页 Tab 也刷新
   const go = useCallback((name, id) => {
-    if (name === 'home' && view.name === 'detail') refresh();
+    if (name === 'home') refresh();
     setView({ name, id });
     if (mainRef.current) mainRef.current.scrollTop = 0;
-  }, [view.name, refresh]);
+  }, [refresh]);
 
   const toggleTag = (t) => {
     if (t === null) setSelectedTags([]);
@@ -109,7 +138,18 @@ export default function App() {
 
       {/* 主区域 */}
       <div className="flex-1 relative min-w-0 flex flex-col">
-        <main ref={mainRef} className="flex-1 overflow-y-auto px-4 pb-24 md:px-8 md:pt-6 md:pb-11">
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-y-auto px-4 pb-24 md:px-8 md:pt-6 md:pb-11"
+          onTouchStart={onMainTouchStart}
+          onTouchMove={onMainTouchMove}
+          onTouchEnd={onMainTouchEnd}
+        >
+          {refreshing && (
+            <div className="flex items-center justify-center gap-2 py-2 text-[12px] text-muted">
+              <span className="spinner"></span><span>刷新中…</span>
+            </div>
+          )}
           {view.name === 'home' && (
             <Home
               recipes={recipes}
@@ -121,7 +161,11 @@ export default function App() {
               onToggleTag={toggleTag}
               q={q}
               setQ={setQ}
+              sort={sort}
+              setSort={setSort}
               onOpen={id => go('detail', id)}
+              onChanged={refresh}
+              onError={onError}
             />
           )}
           {view.name === 'add' && (
@@ -138,7 +182,11 @@ export default function App() {
               setPreview={setPreview}
               referenceText={addDraft.referenceText}
               onBack={() => go('add')}
-              onSaved={() => { refresh(); go('home'); }}
+              onSaved={() => {
+                setAddDraft({ tab: 'link', url: '', title: '', text: '', referenceText: '' });
+                refresh();
+                go('home');
+              }}
               onError={onError}
               toast={toast}
             />

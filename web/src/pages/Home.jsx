@@ -1,7 +1,47 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
+import { api } from '../api.js';
 import { Stars, Cover } from '../components.jsx';
 
-export default function Home({ recipes, allTags, categories = [], selectedCategory, onSelectCategory, selectedTags, onToggleTag, q, setQ, onOpen }) {
+const SORT_OPTIONS = [
+  ['updated', '最近更新'],
+  ['rating', '星级最高'],
+  ['created', '最近收藏'],
+];
+
+export default function Home({ recipes, allTags, categories = [], selectedCategory, onSelectCategory,
+  selectedTags, onToggleTag, q, setQ, sort, setSort, onOpen, onChanged, onError }) {
+
+  const [renaming, setRenaming] = useState(null); // recipe 对象
+  const [renameText, setRenameText] = useState('');
+  const lpTimer = useRef(null);
+  const lpFired = useRef(false);
+
+  const startRename = (r) => { setRenaming(r); setRenameText(r.title); };
+  const submitRename = async () => {
+    const v = renameText.trim();
+    const r = renaming;
+    setRenaming(null);
+    if (!v || v === r.title) return;
+    try {
+      await api.updateRecipe(r.id, { title: v });
+      onChanged();
+    } catch (e) {
+      if (onError) onError(e.message);
+    }
+  };
+
+  const lpStart = (r) => {
+    lpFired.current = false;
+    lpTimer.current = setTimeout(() => {
+      lpTimer.current = null;
+      lpFired.current = true;
+      startRename(r);
+    }, 500);
+  };
+  const lpCancel = () => {
+    if (lpTimer.current) { clearTimeout(lpTimer.current); lpTimer.current = null; }
+  };
+
   return (
     <section>
       <div className="flex items-baseline justify-between px-0.5 pt-5 pb-3.5">
@@ -9,15 +49,24 @@ export default function Home({ recipes, allTags, categories = [], selectedCatego
         <span className="text-xs text-muted">共 {recipes.length} 道</span>
       </div>
 
-      <div className="flex items-center gap-2 bg-card rounded-full px-4 py-2.5 text-[13px] text-muted shadow-soft mb-3">
-        <span>🔍</span>
-        <input
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          placeholder="搜索菜名 / 食材，如「鸡翅」"
-          className="flex-1 bg-transparent outline-none text-ink placeholder:text-muted"
-        />
-        {q && <button onClick={() => setQ('')} className="text-muted">✕</button>}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex-1 flex items-center gap-2 bg-card rounded-full px-4 py-2.5 text-[13px] text-muted shadow-soft">
+          <span>🔍</span>
+          <input
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            placeholder="搜索菜名 / 食材，如「鸡翅」"
+            className="flex-1 bg-transparent outline-none text-ink placeholder:text-muted"
+          />
+          {q && <button onClick={() => setQ('')} className="text-muted">✕</button>}
+        </div>
+        <select
+          value={sort}
+          onChange={e => setSort(e.target.value)}
+          className="shrink-0 bg-card border border-line rounded-full text-[12.5px] text-ink2 px-3 py-2.5 outline-none shadow-soft appearance-none cursor-pointer"
+        >
+          {SORT_OPTIONS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+        </select>
       </div>
 
       {categories.length > 0 && (
@@ -70,9 +119,21 @@ export default function Home({ recipes, allTags, categories = [], selectedCatego
           {recipes.map((r, idx) => (
             <div
               key={r.id}
-              className="bg-card rounded-card overflow-hidden cursor-pointer shadow-soft md:hover:-translate-y-[3px] md:hover:shadow-lift transition-all"
-              onClick={() => onOpen(r.id)}
+              className="group relative bg-card rounded-card overflow-hidden cursor-pointer shadow-soft md:hover:-translate-y-[3px] md:hover:shadow-lift transition-all"
+              onClick={() => { if (!lpFired.current) onOpen(r.id); lpFired.current = false; }}
+              onTouchStart={() => lpStart(r)}
+              onTouchEnd={lpCancel}
+              onTouchMove={lpCancel}
+              onMouseDown={() => lpStart(r)}
+              onMouseUp={lpCancel}
+              onMouseLeave={lpCancel}
             >
+              <button
+                className="absolute top-2 right-2 z-10 hidden md:group-hover:flex w-7 h-7 rounded-full bg-card/90 shadow-soft text-[12px] items-center justify-center text-ink2 hover:text-olive"
+                title="重命名"
+                onClick={e => { e.stopPropagation(); startRename(r); }}
+                onMouseDown={e => e.stopPropagation()}
+              >✏️</button>
               <div className="relative">
                 <Cover recipe={r} className="aspect-[4/3]" />
                 <span className="absolute top-2 left-3 font-serif text-[15px] font-bold text-ink/35 bg-card/70 rounded px-1">
@@ -90,6 +151,38 @@ export default function Home({ recipes, allTags, categories = [], selectedCatego
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* 重命名弹窗 */}
+      {renaming && (
+        <div
+          className="fixed inset-0 z-50 bg-ink/40 flex items-center justify-center p-6"
+          onClick={() => setRenaming(null)}
+        >
+          <div
+            className="bg-card rounded-card shadow-lift p-5 w-full max-w-[320px]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="font-serif text-[17px] font-extrabold text-ink mb-3">重命名</div>
+            <input
+              autoFocus
+              value={renameText}
+              onChange={e => setRenameText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') submitRename(); if (e.key === 'Escape') setRenaming(null); }}
+              className="w-full border-[1.5px] border-line rounded-xl px-3.5 py-3 text-sm outline-none bg-white text-ink focus:border-olive mb-4"
+            />
+            <div className="flex gap-2.5">
+              <button
+                className="flex-1 bg-bg text-ink2 text-sm font-semibold py-2.5 rounded-full"
+                onClick={() => setRenaming(null)}
+              >取消</button>
+              <button
+                className="flex-1 bg-olive text-white text-sm font-semibold py-2.5 rounded-full"
+                onClick={submitRename}
+              >保存</button>
+            </div>
+          </div>
         </div>
       )}
     </section>

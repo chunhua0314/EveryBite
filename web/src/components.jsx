@@ -14,8 +14,17 @@ export function Stars({ value = 0, size = 'text-base', onRate }) {
   );
 }
 
-export function Toast({ msg }) {
+export function BackFab({ onClick }) {
   return (
+    <button
+      onClick={onClick}
+      aria-label="返回"
+      className="fixed top-4 left-4 md:left-[232px] z-40 w-11 h-11 rounded-full bg-card shadow-lift text-ink2 text-[22px] leading-none flex items-center justify-center active:scale-95 transition-transform"
+    >‹</button>
+  );
+}
+
+export function Toast({ msg }) {  return (
     <div
       className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-ink text-white text-[13px] px-5 py-2.5 rounded-full transition-transform duration-300 opacity-95 pointer-events-none ${msg ? 'translate-y-0' : '-translate-y-20'}`}
     >{msg || ''}</div>

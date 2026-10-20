@@ -26,4 +26,12 @@ export const api = {
   listCategories: () => request('/api/categories'),
   listAssets: (category) => request(`/api/assets${category ? `?category=${encodeURIComponent(category)}` : ''}`),
   setCover: (id, body) => request(`/api/recipes/${id}/cover`, { method: 'POST', body: JSON.stringify(body) }),
+  uploadCover: async (id, file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`/api/recipes/${id}/cover-upload`, { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `上传失败（HTTP ${res.status}）`);
+    return data;
+  },
 };
