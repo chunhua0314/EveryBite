@@ -21,6 +21,7 @@ docker run -d --name everybite -p 3456:3456 \
 - 访问：`http://localhost:3456`，同一局域网的手机用 `http://<主机IP>:3456`
 - 不配 `LLM_*` 环境变量也能跑（内置规则解析兜底）；任何 OpenAI 兼容接口（Kimi / DeepSeek 等）均可
 - 数据在 `everybite-data`（SQLite 菜谱库）和 `everybite-covers`（封面素材）两个卷里，删容器不丢数据
+- 构建步骤已在本机按 Dockerfile 逐步仿真验证通过（2026-10，三阶段：前端构建/后端依赖/运行时接口）
 
 ## 本地启动
 
